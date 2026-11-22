@@ -21,7 +21,7 @@ npm run evidence
 
 On 22 November 2026 that command printed 25 passed, 0 failed. Re-run it. A later failure means a recorded hash no longer matches the chain.
 
-The same check runs in the browser, from `apps/web`. It sends nothing.
+The same check runs in the browser. It sends nothing. The public copy is https://haven-ledger-nine.vercel.app. Opened on 22 November 2026. **Verify both lanes** on `/verify` finished at 390px and at 1440px. The tally was 7 checked, 2 agreed on both lanes, 4 refused, and 1 has no hash. Scene 1 agreed: receipt 4 is from the ledger's own qor1, and both heights are 10543960. Scene 3 was refused with `ERC20InsufficientBalance` for 5,000,000 against 900,000. Scene 7 says there is no hash. Horizontal overflow was 0. No scene said "Could not reach the testnet".
 
 ```bash
 cd apps/web
@@ -29,7 +29,7 @@ npm ci
 npm run dev
 ```
 
-**Verify both lanes** is on `/verify`. The list on `/` is the record. The verdict is the testnet. There is no hosted copy yet. Vercel builds this app with the root directory set to `apps/web`. The install is `npm ci` and the build is `npm run build`. Leave both as the framework defaults. Do not set a root `vercel.json`. The one setting is the root directory. The page has no environment variables.
+**Verify both lanes** is on `/verify`. The list on `/` is the record. The verdict is the testnet. The site is the Next.js app in `apps/web`. Vercel builds it with the root directory set to `apps/web`. The install is `npm ci` and the build is `npm run build`. Leave both as the framework defaults. Do not set a root `vercel.json`. The one setting is the root directory. The page has no environment variables.
 
 The same day, after the scenes, these reads matched the scene files: `nonce()` 2, `payoutCount()` 2, fUSD balances 700,000 on the ledger, 200,000 on the payer and 100,000 on the payee, and receipt count 5. Amounts are base units.
 
@@ -133,8 +133,7 @@ The cover is [docs/cover.png](docs/cover.png), 1200×675.
 
 ## Not in the repo yet, and not claimed
 
-- There is no film. The shot list is [docs/DEMO.md](docs/DEMO.md). The film has not been recorded.
-- There is no hosted page yet. `apps/web` is in the repository. It has no public URL.
+- There is no film. The shot list is [docs/DEMO.md](docs/DEMO.md).
 - Scene 8 was not run. A window that hides the bridge cannot be previewed with `eth_call`, and a broadcast would have been a valid pay.
 - Escrow and Steward do not call this contract. A search of those repositories on 22 November 2026 found no `HavenLedger` and not this address.
 - [docs/cover.png](docs/cover.png) has not been uploaded to the project page.

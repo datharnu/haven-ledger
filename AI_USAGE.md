@@ -31,11 +31,11 @@ Those five commits were written in Cursor by Grok 4.7. This note, the README, `d
 - After the scenes, `nonce()` and `payoutCount()` both read 2. The fUSD balances read 700,000, 200,000, and 100,000. The receipt count read 5. Those match `deployments/scene-6.json`.
 - Receipt 4's sender in `deployments/scene-1.json` is `qor1fdhya5x2lxyecp7fjgk7kzu95fgyu6gcs40yzu`.
 - A search of the Escrow and Steward repositories found no `HavenLedger` and not this ledger's address.
+- https://haven-ledger-nine.vercel.app was opened on 22 November 2026. **Verify both lanes** finished: 7 checked, 2 agreed, 4 refused, 1 has no hash. Overflow was 0 at 390px and at 1440px. No scene said "Could not reach the testnet".
 
 ## What was not checked
 
-- There is no film.
-- There is no hosted page. `apps/web` can say "Verify both lanes" on a machine that can reach the testnet. No public URL has been opened.
+- There is no film. The shot list is [docs/DEMO.md](docs/DEMO.md).
 - Scene 8 has no report and no hash.
 - The deployed bytecode was not compared with the source.
 - `deployments/preflight.json` is an `eth_call`. It is not a receipt.

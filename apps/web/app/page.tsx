@@ -81,10 +81,8 @@ export default function Home() {
             </dd>
           </div>
           <div className="grid gap-2 py-4 sm:grid-cols-[240px_minmax(0,1fr)]">
-            <dt className="text-[15px] font-medium text-ink">A hosted page or a film</dt>
-            <dd className="text-[15px] text-muted">
-              This copy runs from the repository. There is no public URL yet, and the film has not been recorded.
-            </dd>
+            <dt className="text-[15px] font-medium text-ink">A film</dt>
+            <dd className="text-[15px] text-muted">The film has not been recorded. This page sends nothing.</dd>
           </div>
           <div className="grid gap-2 py-4 sm:grid-cols-[240px_minmax(0,1fr)]">
             <dt className="text-[15px] font-medium text-ink">Scene 8</dt>
