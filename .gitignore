@@ -1,0 +1,12 @@
+out/
+cache/
+broadcast/
+node_modules/
+.next/
+test-results/
+playwright-report/
+agent-state/
+*.env
+.env*
+cbom.json
+.DS_Store
