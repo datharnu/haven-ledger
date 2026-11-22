@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import scenes from "@/lib/fixtures/scenes.json";
-import { NETWORK, NO_HASH, verifyScene, type Outcome, type Verdict } from "@/lib/check";
+import { NETWORK, NO_HASH, verifyScene, type Expect, type Outcome, type Verdict } from "@/lib/check";
 import { browserNative, browserRpc } from "@/lib/rpc";
 
 type Row = {
@@ -43,7 +43,7 @@ export function VerifyDesk({ autostart }: { autostart: boolean }) {
       const scene = scenes.scenes[index];
       if (!scene) continue;
       setRows((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, state: "reading", verdict: undefined } : row)));
-      const verdict = await verifyScene({ scene: scene.scene, hash: scene.hash }, rpc, browserNative);
+      const verdict = await verifyScene({ scene: scene.scene, hash: scene.hash, expect: scene.expect as Expect }, rpc, browserNative);
       setRows((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, state: "done", verdict } : row)));
     }
     setRunning(false);

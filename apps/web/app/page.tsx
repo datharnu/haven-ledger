@@ -30,7 +30,7 @@ export default function Home() {
         <img src="/cover.png" alt="Haven Ledger. Two lanes joined by one line." width={1200} height={675} className="block h-auto w-full" />
       </figure>
 
-      <section id="record" className="mt-20 border-t border-line pt-14 sm:mt-24 sm:pt-16">
+      <section id="record" className="mt-20 scroll-mt-32 border-t border-line pt-14 sm:mt-24 sm:pt-16">
         <p className="text-[12px] font-medium tracking-[0.12em] text-muted uppercase">The record · {scenes.recordedOn}</p>
         <h2 className="mt-3 max-w-[22ch] text-[28px] leading-[1.12] font-medium tracking-[-0.03em] sm:text-[36px]">
           Seven scenes. This list is not the verdict.

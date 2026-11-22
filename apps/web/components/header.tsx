@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NavLink } from "./nav-link";
 import { ThemeToggle } from "./theme";
 
 export function Mark() {
@@ -23,15 +24,8 @@ export function Header() {
           </span>
         </Link>
         <nav className="flex items-center gap-1" aria-label="Pages">
-          <Link href="/" className="inline-flex h-10 items-center rounded-lg px-3 text-sm text-muted transition-colors hover:bg-raise hover:text-ink">
-            Ledger
-          </Link>
-          <Link
-            href="/verify"
-            className="inline-flex h-10 items-center rounded-lg px-3 text-sm text-muted transition-colors hover:bg-raise hover:text-ink"
-          >
-            Check
-          </Link>
+          <NavLink href="/">Ledger</NavLink>
+          <NavLink href="/verify">Check</NavLink>
           <ThemeToggle />
         </nav>
       </div>

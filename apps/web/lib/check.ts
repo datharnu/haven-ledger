@@ -86,7 +86,13 @@ export type Verdict = {
   heights?: { native: string; evm: string };
 };
 
-type Scene = { scene: number; hash: string | null };
+/** What `deployments/scene-<n>.json` recorded. The chain still has to say the same thing. */
+export type Expect =
+  | { outcome: "agreed"; signedNonce: number }
+  | { outcome: "refused"; reason: string; signedNonce: number | null }
+  | { outcome: "no-hash" };
+
+type Scene = { scene: number; hash: string | null; expect?: Expect };
 
 export function viewData(name: "nonce" | "payer" | "payee" | "token" | "receipts" | "ledgerAccount" | "payout", args: readonly unknown[] = []): Hex {
   return encodeFunctionData({ abi: ledgerAbi, functionName: name, args });
@@ -210,8 +216,20 @@ async function checkHash(scene: Scene, hash: string, rpc: Rpc, native: ReadNativ
     },
   ];
 
+  const expect = scene.expect;
+  if (!expect || expect.outcome === "no-hash") return failed(scene, "This scene has no recorded result to compare with.", lines);
+  const wantNonce = expect.signedNonce === null ? undefined : BigInt(expect.signedNonce);
+  if (signedNonce !== wantNonce) {
+    const want = wantNonce === undefined ? "no nonce" : `nonce ${wantNonce.toString()}`;
+    return failed(scene, `The signature was recorded at ${want}, and the chain says otherwise.`, lines);
+  }
+
   if (receipt.status === "reverted") {
+    if (expect.outcome !== "refused") return failed(scene, "This scene was recorded as a payout, and the transaction reverted.", lines);
     const reason = await revertReason(rpc, tx, receipt.blockNumber);
+    if (!reason.includes(expect.reason)) {
+      return failed(scene, `Refused for a different reason than recorded: ${reason}`, lines);
+    }
     return {
       scene: scene.scene,
       hash,
@@ -221,6 +239,7 @@ async function checkHash(scene: Scene, hash: string, rpc: Rpc, native: ReadNativ
     };
   }
 
+  if (expect.outcome !== "agreed") return failed(scene, "This scene was recorded as a refusal, and the transaction succeeded.", lines);
   if (signedNonce === undefined) return failed(scene, "The signature does not verify.", lines);
   const moved = movedFrom(receipt.logs, ledger);
   if (!moved) return failed(scene, "The receipt has no Moved event.", lines);

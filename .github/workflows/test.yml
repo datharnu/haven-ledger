@@ -31,6 +31,12 @@ jobs:
         working-directory: apps/web
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: forge build, for the ABI check
+        working-directory: .
+        run: forge build
       - uses: actions/setup-node@v4
         with:
           node-version: 22

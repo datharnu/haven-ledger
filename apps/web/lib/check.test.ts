@@ -1,10 +1,18 @@
 import { readFileSync } from "node:fs";
 import type { Address, Hex } from "viem";
 import { describe, expect, it } from "vitest";
-import { CallError, NETWORK, NO_HASH, NetworkError, verifyScene, type NativeReceipt, type Rpc } from "./check";
+import { CallError, NETWORK, NO_HASH, NetworkError, ledgerAbi, verifyScene, type Expect, type NativeReceipt, type Rpc } from "./check";
 import scenes from "./fixtures/scenes.json";
 import recorded from "./fixtures/recorded-rpc.json";
 import { PAY, argsHash, commitmentOf, encodeAuthMessage, noteOf } from "./ledger";
+
+type Scene = { scene: number; hash: string | null; expect: Expect };
+
+function sceneAt(index: number): Scene {
+  const scene = scenes.scenes[index];
+  if (!scene) throw new Error(`missing scene ${index + 1}`);
+  return { scene: scene.scene, hash: scene.hash, expect: scene.expect as Expect };
+}
 
 const LEDGER = "0x3333333333333333333333333333333333333333" as Address;
 const PAYER = "0x1111111111111111111111111111111111111111" as Address;
@@ -98,6 +106,25 @@ describe("the message builder", () => {
   });
 });
 
+describe("the page's ABI", () => {
+  type Entry = { type: string; name?: string };
+  const key = (entry: Entry) => `${entry.type}:${entry.name ?? ""}`;
+  const relayed = ["error:Error", "error:ERC20InsufficientBalance"];
+
+  it("matches what forge compiled for every ledger entry it uses", () => {
+    const compiled = JSON.parse(readFileSync(new URL("../../../out/HavenLedger.sol/HavenLedger.json", import.meta.url), "utf8")) as {
+      abi: Entry[];
+    };
+    const byKey = new Map(compiled.abi.map((entry) => [key(entry), entry]));
+    const page = ledgerAbi as readonly Entry[];
+    expect(page.filter((entry) => !byKey.has(key(entry))).map(key).sort()).toEqual([...relayed].sort());
+    for (const entry of page) {
+      if (relayed.includes(key(entry))) continue;
+      expect(entry, key(entry)).toEqual(byKey.get(key(entry)));
+    }
+  });
+});
+
 describe("the fixture names the recorded hashes", () => {
   it("matches deployments and carries no signature", () => {
     const text = readFileSync(new URL("./fixtures/scenes.json", import.meta.url), "utf8");
@@ -119,8 +146,8 @@ describe("recorded replies", () => {
   const native = nativeFrom(replies);
 
   it("agrees on scene 1 and scene 6", async () => {
-    const pay = await verifyScene(scenes.scenes[0], rpc, native);
-    const refund = await verifyScene(scenes.scenes[5], rpc, native);
+    const pay = await verifyScene(sceneAt(0), rpc, native);
+    const refund = await verifyScene(sceneAt(5), rpc, native);
     expect(pay.outcome).toBe("agreed");
     expect(pay.heights).toEqual({ native: "10543960", evm: "10543960" });
     expect(pay.summary).toBe("Both lanes agree. The Native receipt names this payout.");
@@ -130,25 +157,54 @@ describe("recorded replies", () => {
 
   it("refuses scenes 2 through 5 from the receipt, not the fixture text", async () => {
     for (const index of [1, 2, 3, 4]) {
-      const scene = scenes.scenes[index];
-      if (!scene) throw new Error("missing scene");
+      const scene = sceneAt(index);
       const verdict = await verifyScene(scene, rpc, native);
       expect(verdict.outcome).toBe("refused");
-      expect(verdict.summary).not.toBe(scene.record);
+      expect(verdict.summary).not.toBe(scenes.scenes[index]?.record);
     }
-    const balance = await verifyScene(scenes.scenes[2], rpc, native);
+    const balance = await verifyScene(sceneAt(2), rpc, native);
     expect(balance.summary.startsWith("ERC20InsufficientBalance")).toBe(true);
-    const junk = await verifyScene(scenes.scenes[3], rpc, native);
+    const junk = await verifyScene(sceneAt(3), rpc, native);
     expect(junk.lines.find((line) => line.label === "Signature")?.detail).toBe("The signature does not verify.");
-    const replay = await verifyScene(scenes.scenes[4], rpc, native);
+    const replay = await verifyScene(sceneAt(4), rpc, native);
     expect(replay.lines.find((line) => line.label === "Signature")?.detail).toBe("The signature verifies at nonce 0.");
-    const note = await verifyScene(scenes.scenes[1], rpc, native);
+    const note = await verifyScene(sceneAt(1), rpc, native);
     expect(note.summary).toContain("the note must be 1 to 140 characters");
+  });
+
+  it("a revert for a different reason is not the recorded refusal", async () => {
+    const note = sceneAt(1);
+    const verdict = await verifyScene({ ...note, expect: { outcome: "refused", reason: "ERC20InsufficientBalance", signedNonce: 1 } }, rpc, native);
+    expect(verdict.outcome).toBe("failed");
+    expect(verdict.summary).toContain("different reason");
+  });
+
+  it("a signature at a different nonce is not the recorded refusal", async () => {
+    const replay = sceneAt(4);
+    const verdict = await verifyScene({ ...replay, expect: { outcome: "refused", reason: "SignatureInvalid", signedNonce: null } }, rpc, native);
+    expect(verdict.outcome).toBe("failed");
+  });
+
+  it("a reverted payout is not a pass, and a refusal that succeeds is not a pass", async () => {
+    const reverted = await verifyScene({ ...sceneAt(2), expect: { outcome: "agreed", signedNonce: 1 } }, rpc, native);
+    expect(reverted.outcome).toBe("failed");
+    const succeeded = await verifyScene({ ...sceneAt(0), expect: { outcome: "refused", reason: "SignatureInvalid", signedNonce: 0 } }, rpc, native);
+    expect(succeeded.outcome).toBe("failed");
+  });
+
+  it("a refusal never reads the Native lane", async () => {
+    let read = false;
+    const watching = async (id: bigint): Promise<NativeReceipt> => {
+      read = true;
+      return native(id);
+    };
+    for (const index of [1, 2, 3, 4]) await verifyScene(sceneAt(index), rpc, watching);
+    expect(read).toBe(false);
   });
 
   it("does not look for a hash on scene 7", async () => {
     let called = false;
-    const verdict = await verifyScene(scenes.scenes[6], async () => {
+    const verdict = await verifyScene(sceneAt(6), async () => {
       called = true;
       throw new NetworkError();
     }, native);
@@ -162,13 +218,13 @@ describe("recorded replies", () => {
       const row = await native(id);
       return { ...row, note: `${row.note} ` };
     };
-    const verdict = await verifyScene(scenes.scenes[0], rpc, tampered);
+    const verdict = await verifyScene(sceneAt(0), rpc, tampered);
     expect(verdict.outcome).toBe("failed");
     expect(verdict.outcome).not.toBe("agreed");
   });
 
   it("a network failure is never a pass", async () => {
-    const verdict = await verifyScene(scenes.scenes[0], async () => {
+    const verdict = await verifyScene(sceneAt(0), async () => {
       throw new NetworkError();
     }, native);
     expect(verdict.outcome).toBe("offline");
