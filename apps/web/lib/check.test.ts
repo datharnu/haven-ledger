@@ -1,0 +1,177 @@
+import { readFileSync } from "node:fs";
+import type { Address, Hex } from "viem";
+import { describe, expect, it } from "vitest";
+import { CallError, NETWORK, NO_HASH, NetworkError, verifyScene, type NativeReceipt, type Rpc } from "./check";
+import scenes from "./fixtures/scenes.json";
+import recorded from "./fixtures/recorded-rpc.json";
+import { PAY, argsHash, commitmentOf, encodeAuthMessage, noteOf } from "./ledger";
+
+const LEDGER = "0x3333333333333333333333333333333333333333" as Address;
+const PAYER = "0x1111111111111111111111111111111111111111" as Address;
+const PAYEE = "0x2222222222222222222222222222222222222222" as Address;
+const TOKEN = "0x97143B771D34ddb9130b807b135Ae675A5a963CA" as Address;
+const MESSAGE =
+  "0xe75e64e2fe37c327a6196b667e791aa53e61a6f7df40e7ac0542d985cea36278000000000000000000000000000000000000000000000000000000000000264800000000000000000000000033333333333333333333333333333333333333330000000000000000000000001111111111111111111111111111111111111111ce4f2429734c4677d82d9d124f394bf747b4657eeebba8e1acd340ec5675e2480000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006553ff105c0abb9c891d31397c12868300827dc80119bbeef5e35421f16633c1ea33cd77" as Hex;
+
+type Recorded = {
+  chainId: string;
+  transactions: Record<string, unknown>;
+  receipts: Record<string, unknown>;
+  calls: { to: string; data: string; result: string }[];
+  replays: { data: string; block: string; errorData?: string; result?: string }[];
+  native: Record<string, { data: { id: number; sender: string; note: string; height: number } }>;
+};
+
+const replies = recorded as Recorded;
+
+function rpcFrom(source: Recorded): Rpc {
+  return async (method, params) => {
+    if (method === "eth_chainId") return source.chainId;
+    if (method === "eth_getTransactionByHash") {
+      const tx = source.transactions[String(params[0])];
+      if (!tx) throw new NetworkError();
+      return tx;
+    }
+    if (method === "eth_getTransactionReceipt") {
+      const receipt = source.receipts[String(params[0])];
+      if (!receipt) throw new NetworkError();
+      return receipt;
+    }
+    if (method === "eth_call") {
+      const call = params[0] as { to?: string; data?: string };
+      const block = String(params[1]);
+      if (block !== "latest") {
+        const replay = source.replays.find((item) => item.data === call.data && item.block === block);
+        if (!replay) throw new NetworkError();
+        if (replay.errorData) throw new CallError("execution reverted", replay.errorData as Hex);
+        return replay.result;
+      }
+      const found = source.calls.find((item) => item.to.toLowerCase() === String(call.to).toLowerCase() && item.data === call.data);
+      if (!found) throw new NetworkError();
+      return found.result;
+    }
+    throw new NetworkError();
+  };
+}
+
+function nativeFrom(source: Recorded) {
+  return async (id: bigint): Promise<NativeReceipt> => {
+    const row = source.native[id.toString()]?.data;
+    if (!row) throw new NetworkError();
+    return { id: String(row.id), sender: row.sender, note: row.note, height: String(row.height) };
+  };
+}
+
+describe("the message builder", () => {
+  it("rebuilds the shared vector", () => {
+    const signature = `0x${"00".repeat(4627)}` as Hex;
+    expect(argsHash(PAYEE, TOKEN, 100_000n, "invoice 1")).toBe("0x5c0abb9c891d31397c12868300827dc80119bbeef5e35421f16633c1ea33cd77");
+    expect(
+      commitmentOf({
+        chainId: 9800n,
+        ledger: LEDGER,
+        action: PAY,
+        to: PAYEE,
+        token: TOKEN,
+        amount: 100_000n,
+        nonce: 0n,
+        signature,
+      }),
+    ).toBe("0x3a828fa2d2b949686b1ccb8fe942eb93870d0a6c48ac78524d8a70412563544b");
+    expect(noteOf(0n, "0x3a828fa2d2b949686b1ccb8fe942eb93870d0a6c48ac78524d8a70412563544b", "invoice 1")).toBe(
+      "haven-ledger v1 n=0 c=0x3a828fa2d2b949686b1ccb8fe942eb93870d0a6c48ac78524d8a70412563544b m=invoice 1",
+    );
+    expect(
+      encodeAuthMessage({
+        chainId: 9800n,
+        ledger: LEDGER,
+        payer: PAYER,
+        action: PAY,
+        nonce: 0n,
+        deadline: 1_700_003_600n,
+        to: PAYEE,
+        token: TOKEN,
+        amount: 100_000n,
+        memo: "invoice 1",
+      }),
+    ).toBe(MESSAGE);
+  });
+});
+
+describe("the fixture names the recorded hashes", () => {
+  it("matches deployments and carries no signature", () => {
+    const text = readFileSync(new URL("./fixtures/scenes.json", import.meta.url), "utf8");
+    expect(/0x[0-9a-fA-F]{80,}/.test(text)).toBe(false);
+    for (const scene of scenes.scenes) {
+      const doc = JSON.parse(readFileSync(new URL(`../../../deployments/scene-${scene.scene}.json`, import.meta.url), "utf8")) as {
+        transactions?: { hash: string }[];
+        note?: string;
+      };
+      const evm = (doc.transactions ?? []).find((tx) => tx.hash.startsWith("0x"));
+      expect(scene.hash).toBe(evm?.hash ?? null);
+      if (scene.scene === 7) expect(scene.record).toBe(doc.note);
+    }
+  });
+});
+
+describe("recorded replies", () => {
+  const rpc = rpcFrom(replies);
+  const native = nativeFrom(replies);
+
+  it("agrees on scene 1 and scene 6", async () => {
+    const pay = await verifyScene(scenes.scenes[0], rpc, native);
+    const refund = await verifyScene(scenes.scenes[5], rpc, native);
+    expect(pay.outcome).toBe("agreed");
+    expect(pay.heights).toEqual({ native: "10543960", evm: "10543960" });
+    expect(pay.summary).toBe("Both lanes agree. The Native receipt names this payout.");
+    expect(refund.outcome).toBe("agreed");
+    expect(refund.heights).toEqual({ native: "10544236", evm: "10544236" });
+  });
+
+  it("refuses scenes 2 through 5 from the receipt, not the fixture text", async () => {
+    for (const index of [1, 2, 3, 4]) {
+      const scene = scenes.scenes[index];
+      if (!scene) throw new Error("missing scene");
+      const verdict = await verifyScene(scene, rpc, native);
+      expect(verdict.outcome).toBe("refused");
+      expect(verdict.summary).not.toBe(scene.record);
+    }
+    const balance = await verifyScene(scenes.scenes[2], rpc, native);
+    expect(balance.summary.startsWith("ERC20InsufficientBalance")).toBe(true);
+    const junk = await verifyScene(scenes.scenes[3], rpc, native);
+    expect(junk.lines.find((line) => line.label === "Signature")?.detail).toBe("The signature does not verify.");
+    const replay = await verifyScene(scenes.scenes[4], rpc, native);
+    expect(replay.lines.find((line) => line.label === "Signature")?.detail).toBe("The signature verifies at nonce 0.");
+    const note = await verifyScene(scenes.scenes[1], rpc, native);
+    expect(note.summary).toContain("the note must be 1 to 140 characters");
+  });
+
+  it("does not look for a hash on scene 7", async () => {
+    let called = false;
+    const verdict = await verifyScene(scenes.scenes[6], async () => {
+      called = true;
+      throw new NetworkError();
+    }, native);
+    expect(called).toBe(false);
+    expect(verdict.outcome).toBe("no-hash");
+    expect(verdict.summary).toBe(NO_HASH);
+  });
+
+  it("a changed Native note is not a pass", async () => {
+    const tampered = async (id: bigint): Promise<NativeReceipt> => {
+      const row = await native(id);
+      return { ...row, note: `${row.note} ` };
+    };
+    const verdict = await verifyScene(scenes.scenes[0], rpc, tampered);
+    expect(verdict.outcome).toBe("failed");
+    expect(verdict.outcome).not.toBe("agreed");
+  });
+
+  it("a network failure is never a pass", async () => {
+    const verdict = await verifyScene(scenes.scenes[0], async () => {
+      throw new NetworkError();
+    }, native);
+    expect(verdict.outcome).toBe("offline");
+    expect(verdict.summary).toBe(NETWORK);
+  });
+});

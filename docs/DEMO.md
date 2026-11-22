@@ -11,7 +11,8 @@ Say the words as written. Do not add a wallet, a new transaction, or a third nam
 | 1:10–1:55 | Scene 3, the centre | The reverted transaction `0x5fa5d1bcab4e0fc6282fd9b823eae62c66bd64782708ea06869d04b41d087d4f` | "This is the one that has to fail together. The pay asked for 5000000. The ledger held 900000. The transaction reverted. The Native count stayed 4. Neither lane changed." |
 | 1:55–2:25 | Scenes 4 and 5 | `0x5db0afa49e3ec28c2359ca3c1a40b0ec5538ecdd54894f82b8f0c15cbd0fbfad` and `0xc78e0efe3806c3d032fda2374551359246d0f1dadd936d0107a5f63dca2a4677` | "A junk signature is SignatureInvalid. The scene 1 signature, sent again, is SignatureInvalid. The count stayed 4." |
 | 2:25–2:40 | Scene 7 | `deployments/scene-7.json` | "Refused before broadcast; there is no hash." |
-| 2:40–3:00 | The repository | https://github.com/datharnu/haven-ledger | "The hashes are in the repository. npm run evidence re-checks both lanes. It needs no key. The film is not a transaction." |
+| 2:40–2:50 | Verify both lanes | `/verify` | "Verify both lanes reads the testnet. It does not trust this page's list. Scene 1 agrees on both lanes. Receipt 4 names the ledger. Scene 3 reverted and wrote no payout." |
+| 2:50–3:00 | The repository | https://github.com/datharnu/haven-ledger | "The hashes are in the repository. npm run evidence re-checks both lanes. It needs no key. The film is not a transaction." |
 
-Verify both lanes
+Verify both lanes reads the testnet from `/verify`. It does not trust the list on the page. Scene 1 agrees on both lanes. Scene 3 reverted and wrote no payout.
 

@@ -1,0 +1,65 @@
+{
+  "recordedOn": "22 November 2026",
+  "network": "qorechain-diana",
+  "chainId": 9800,
+  "ledger": "0x4B6E4ed0Caf9899c07c9922DEb0b85A2504E6918",
+  "ledgerAccount": "qor1fdhya5x2lxyecp7fjgk7kzu95fgyu6gcs40yzu",
+  "payer": {
+    "qor": "qor1fw43p6292ljewm7l2hxtu47jd8v66hmkyajz4q",
+    "evm": "0x4bAb10E94557E5976FDf55cCbe57D269d9Ad5f76"
+  },
+  "payee": {
+    "qor": "qor1yfs8uxwhq9ammnu5eeafk3r0387k94fs82n86g",
+    "evm": "0x22607e19d7017bBdCf94Ce7a9B446F89fD62d530"
+  },
+  "token": "0x97143B771D34ddb9130b807b135Ae675A5a963CA",
+  "receipts": "qor1xjayq5ev55tkzpml9klxwyshr7gdrha0nurha9jhm0f0gdckksgs3gltw8",
+  "spike": {
+    "qor": "qor143f0ghn8slqguwez73087dvq8lqnuuukqdu9fl",
+    "evm": "0xaC52f45E6787c08E3B22f45e7f35803Fc13e7396"
+  },
+  "scenes": [
+    {
+      "scene": 1,
+      "title": "Pay the payee",
+      "hash": "0x915c5f80901db1c4097ca1d766a07e86876dd41bf9050a4b37f4a50593e468a3",
+      "record": "Pay 100000. Receipt 4 at height 10543960. Count 3 to 4. Ledger 900000. Payer 0. Payee 100000."
+    },
+    {
+      "scene": 2,
+      "title": "A note the receipt book refuses",
+      "hash": "0xe30358d24980be8452ba43259b3427f31365fda9b3412d1fcba738aa98e5c0ed",
+      "record": "Reverted. Count stayed 4. Error cross-VM call failed: the note must be 1 to 140 characters: execute wasm contract failed: CosmWasm contract execution failed"
+    },
+    {
+      "scene": 3,
+      "title": "More than the ledger holds",
+      "hash": "0x5fa5d1bcab4e0fc6282fd9b823eae62c66bd64782708ea06869d04b41d087d4f",
+      "record": "Reverted. Count stayed 4. ERC20InsufficientBalance 0x4B6E4ed0Caf9899c07c9922DEb0b85A2504E6918 900000 5000000"
+    },
+    {
+      "scene": 4,
+      "title": "A signature that is not the payer's",
+      "hash": "0x5db0afa49e3ec28c2359ca3c1a40b0ec5538ecdd54894f82b8f0c15cbd0fbfad",
+      "record": "Reverted. Count stayed 4. SignatureInvalid SignatureInvalid"
+    },
+    {
+      "scene": 5,
+      "title": "The first signature, sent again",
+      "hash": "0xc78e0efe3806c3d032fda2374551359246d0f1dadd936d0107a5f63dca2a4677",
+      "record": "Reverted. Count stayed 4. SignatureInvalid SignatureInvalid"
+    },
+    {
+      "scene": 6,
+      "title": "Refund the payer",
+      "hash": "0x78a95df330323747e9def24189446977a70869af091545ca6f4c420d34ec490d",
+      "record": "Refund 200000. Receipt 5 at height 10544236. Count 4 to 5. Ledger 700000. Payer 200000. Payee 100000."
+    },
+    {
+      "scene": 7,
+      "title": "A target the bridge does not list",
+      "hash": null,
+      "record": "Refused before broadcast; there is no hash."
+    }
+  ]
+}

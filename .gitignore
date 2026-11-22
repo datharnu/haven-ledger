@@ -10,3 +10,5 @@ agent-state/
 .env*
 cbom.json
 .DS_Store
+*.tsbuildinfo
+AGENTS.md
