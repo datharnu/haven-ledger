@@ -4,6 +4,10 @@
 
 fUSD leaves the ledger only for the payee or the payer named at creation. It leaves only with a fresh ML-DSA-87 signature from the payer. In the same transaction, the ledger writes a receipt into `qday-receipts`, a Native (CosmWasm) contract that governance put on the CrossVM allowlist. The Native receipt carries the payout's commitment. The EVM payout stores the Native receipt id. If either lane refuses, neither lane changes.
 
+## Deployed
+
+On 22 November 2026 the ledger on `qorechain-diana` (EVM chain id 9800) is `0x4B6E4ed0Caf9899c07c9922DEb0b85A2504E6918`. Its Native name is `qor1fdhya5x2lxyecp7fjgk7kzu95fgyu6gcs40yzu`. Scene 1, transaction `0x915c5f80901db1c4097ca1d766a07e86876dd41bf9050a4b37f4a50593e468a3`, wrote receipt 4. The sender on that receipt is the same `qor1`. The Native sender of a contract call is the contract's own `qor1`.
+
 ## Parts
 
 | Part | Where | Who controls it |
@@ -50,7 +54,7 @@ From an EVM transaction alone:
 3. Query `qday-receipts` for `{"receipt":{"id":<receiptId>}}`.
 4. Check the sender is the ledger's `qor1` name, and the note contains `n=<id>` and the commitment.
 5. Check the payer's signature against the key `pqcKeyStatus` reports.
-6. Compare the Native height with the EVM block. On testnet the bridge reported the pending height, one above `eth_blockNumber`. The ledger stores both and does not require them to match.
+6. Compare the Native height with the EVM block. The ledger stores both and does not require them to match. On 22 November 2026 the two successful contract calls stored the same number for both: receipt 4 at height 10543960, receipt 5 at height 10544236. An earlier `eth_call` from an account, in `deployments/preflight.json`, reported a height one above the block. That call did not write a receipt.
 
 ## Not in this contract
 

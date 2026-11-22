@@ -1,6 +1,24 @@
 # Threat model
 
-Nothing below has run on testnet yet. Every claim is backed by a Foundry test, named in brackets. The CrossVM bridge does not exist in Foundry, so the tests use `test/mocks/FakeBridge.sol`, etched at `0x…0901`. It copies the replies and refusals read from qorechain-diana on 21 and 22 November 2026 with read-only `eth_call`.
+Every Foundry claim below is backed by a test, named in brackets. The CrossVM bridge does not exist in Foundry, so the tests use `test/mocks/FakeBridge.sol`, etched at `0x…0901`. It copies the replies and refusals read from qorechain-diana on 21 and 22 November 2026 with read-only `eth_call`. The seven scenes under "What the testnet showed" ran on 22 November 2026. Scene 7 was not broadcast.
+
+## What the testnet showed
+
+The ledger is `0x4B6E4ed0Caf9899c07c9922DEb0b85A2504E6918`. Amounts are fUSD base units. The count is the number of receipts in `qday-receipts`.
+
+| Scene | What the chain did | Hash |
+| --- | --- | --- |
+| 1 | Pay of 100,000 to the payee. Receipt 4, height 10543960, sender the ledger. Count 3 to 4. Ledger 900,000. Payee 100,000 | `0x915c5f80901db1c4097ca1d766a07e86876dd41bf9050a4b37f4a50593e468a3` |
+| 2 | Reverted. The reason contains `the note must be 1 to 140 characters`. Count stayed 4 | `0xe30358d24980be8452ba43259b3427f31365fda9b3412d1fcba738aa98e5c0ed` |
+| 3 | Reverted `ERC20InsufficientBalance` for 5,000,000 against a balance of 900,000. Count stayed 4 | `0x5fa5d1bcab4e0fc6282fd9b823eae62c66bd64782708ea06869d04b41d087d4f` |
+| 4 | Reverted `SignatureInvalid`. Count stayed 4 | `0x5db0afa49e3ec28c2359ca3c1a40b0ec5538ecdd54894f82b8f0c15cbd0fbfad` |
+| 5 | The scene 1 signature sent again. Reverted `SignatureInvalid`. Count stayed 4 | `0xc78e0efe3806c3d032fda2374551359246d0f1dadd936d0107a5f63dca2a4677` |
+| 6 | Refund of 200,000 to the payer. Receipt 5, height 10544236. Count 4 to 5. Ledger 700,000. Payer 200,000. Payee 100,000. Nonce 2 | `0x78a95df330323747e9def24189446977a70869af091545ca6f4c420d34ec490d` |
+| 7 | Refused before broadcast; there is no hash. The bridge returned `cross-VM bridge call refused: target cosmwasm:qor1qg5ega6dykkxc307y25pecuufrjkxkaggkkxh7nad0vhyhtuhw3sqaa3c5 is not allowlisted` | none |
+
+Scene 1 is the sender check. Receipt 4 was written by the contract, and its sender is `qor1fdhya5x2lxyecp7fjgk7kzu95fgyu6gcs40yzu`, the ledger's own name. The Native sender of a contract call is the contract's own `qor1`. An earlier `eth_call` from an account, stored in `deployments/preflight.json`, named that account instead, and it did not write a receipt.
+
+Scene 3 is the atomic refusal. The token revert came after the bridge call. The receipt count did not move.
 
 ## What is protected
 
@@ -32,13 +50,14 @@ The invariant run drives honest, forged, replayed and oversized calls through a 
 
 **`qday-receipts` is shared.** Anyone can write a receipt into it. A receipt belongs to the ledger only if its sender is the ledger's `qor1` name. A reader who skips that check can be fooled.
 
-**The bridge and the chain.** The ledger trusts the precompile to call the named contract, to report the real sender, and to undo the Native write when the EVM reverts. Docs and the 22 November probes support this. The probes used `eth_call` from an account, not from a contract.
+**The bridge and the chain.** The ledger trusts the precompile to call the named contract, to report the real sender, and to undo the Native write when the EVM reverts. Scene 1 showed the sender of a contract call is the ledger's own `qor1`. Scene 3 showed a reverted pay left the receipt count at 4. The earlier account `eth_call` is not that proof.
 
 **Metadata.** Amounts, memos, parties and commitments are public on both lanes.
 
 **A lost payer key.** Funds stay in the ledger. There is no recovery path.
 
-## Open before testnet
+## What scene 1 settled
 
-- The docs say the Native sender for a contract's bridge call is the contract's own `qor1` name. If testnet shows a different sender, every payout reverts `ReplyMismatch`. That fails closed, but the ledger would be unusable and the reply check would need to change.
-- Gas for the real ML-DSA-87 verify plus the CosmWasm write is not known. It has to be estimated with `eth_estimateGas` before any broadcast.
+The reply check requires the Native sender to be the ledger's own `qor1`. Receipt 4 names `qor1fdhya5x2lxyecp7fjgk7kzu95fgyu6gcs40yzu`. That is `ledgerAccount` on `0x4B6E4ed0Caf9899c07c9922DEb0b85A2504E6918`. The pay stored receipt 4. A different sender would have reverted `ReplyMismatch`.
+
+The pay used 889,125 gas. The refund used 846,143. Each refusal used 1,000,000. Those figures are in `deployments/`.
