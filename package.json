@@ -8,10 +8,10 @@
     "test:sol": "/opt/homebrew/bin/forge test",
     "test:ts": "vitest run",
     "typecheck": "tsc --noEmit",
+    "fund-account": "tsx scripts/fund-account.ts",
     "deploy": "tsx scripts/deploy.ts",
     "fund-ledger": "tsx scripts/fund-ledger.ts",
-    "scenes": "tsx scripts/scenes.ts",
-    "evidence": "tsx scripts/evidence.ts"
+    "scenes": "tsx scripts/scenes.ts"
   },
   "dependencies": {
     "@cosmjs/stargate": "0.39.0",

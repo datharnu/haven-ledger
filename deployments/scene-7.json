@@ -1,0 +1,10 @@
+{
+  "network": "qorechain-diana",
+  "scene": 7,
+  "ok": true,
+  "ranAt": "2026-11-22T08:44:42.941Z",
+  "note": "Refused before broadcast; there is no hash.",
+  "result": {
+    "reason": "Error cross-VM bridge call refused: target cosmwasm:qor1qg5ega6dykkxc307y25pecuufrjkxkaggkkxh7nad0vhyhtuhw3sqaa3c5 is not allowlisted"
+  }
+}

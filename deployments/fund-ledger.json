@@ -1,0 +1,9 @@
+{
+  "network": "qorechain-diana",
+  "ok": true,
+  "ledger": "0x4B6E4ed0Caf9899c07c9922DEb0b85A2504E6918",
+  "amount": "1000000",
+  "hash": "9ECA49BBD47467966800637D55BD35440B4095292566B551BF13F78F7A33925F",
+  "balance": "1000000",
+  "ranAt": "2026-11-22T08:22:47.254Z"
+}

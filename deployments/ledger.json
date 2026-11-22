@@ -1,0 +1,34 @@
+{
+  "network": "qorechain-diana",
+  "ok": true,
+  "transactions": [
+    {
+      "hash": "02DC8C4BEE87B449588CE57684AF72C2D45CEEF4C40B25D713B3B25C371DBD5C",
+      "note": "open unscoped deploy window",
+      "gasUsed": "187340",
+      "fee": "180000"
+    },
+    {
+      "hash": "0xe13ba27c1ef83f18c1e1afb237447d2075d2c23bf666022c31463ecd261edac4",
+      "note": "deploy HavenLedger budget 268404 uqor",
+      "gasUsed": "1988176",
+      "fee": "223670"
+    },
+    {
+      "hash": "7D932A024B35D3376F4414A74A9721CBCFA5A2F8AA4E846455BD96289197A3C8",
+      "note": "close deploy window",
+      "gasUsed": "170532",
+      "fee": "180000"
+    }
+  ],
+  "ledger": "0x4B6E4ed0Caf9899c07c9922DEb0b85A2504E6918",
+  "constructorArgs": {
+    "payer": "0x4bAb10E94557E5976FDf55cCbe57D269d9Ad5f76",
+    "payee": "0x22607e19d7017bBdCf94Ce7a9B446F89fD62d530",
+    "token": "0x97143B771D34ddb9130b807b135Ae675A5a963CA",
+    "receipts": "qor1xjayq5ev55tkzpml9klxwyshr7gdrha0nurha9jhm0f0gdckksgs3gltw8"
+  },
+  "deployer": "0xaC52f45E6787c08E3B22f45e7f35803Fc13e7396",
+  "ledgerAccount": "qor1fdhya5x2lxyecp7fjgk7kzu95fgyu6gcs40yzu",
+  "ranAt": "2026-11-22T08:19:52.572Z"
+}

@@ -1,0 +1,25 @@
+{
+  "network": "qorechain-diana",
+  "accounts": [
+    {
+      "name": "ledger-payer",
+      "qor1": "qor1fw43p6292ljewm7l2hxtu47jd8v66hmkyajz4q",
+      "evm": "0x4bAb10E94557E5976FDf55cCbe57D269d9Ad5f76",
+      "hash": "871100955616776AB80EE1E7D8749F1E9C36A530A962237464E1DB76CA081617",
+      "note": "spike hybrid MsgSend of 3000000 uqor"
+    },
+    {
+      "name": "ledger-payer",
+      "qor1": "qor1fw43p6292ljewm7l2hxtu47jd8v66hmkyajz4q",
+      "evm": "0x4bAb10E94557E5976FDf55cCbe57D269d9Ad5f76",
+      "hash": "E8B758F28878BDC0CEE735B8685F8115D3FFBF8D4EF7BAE20D9830FEAA88EA33",
+      "note": "classical ML-DSA-87 enrollment with proof of possession"
+    },
+    {
+      "name": "ledger-payee",
+      "qor1": "qor1yfs8uxwhq9ammnu5eeafk3r0387k94fs82n86g",
+      "evm": "0x22607e19d7017bBdCf94Ce7a9B446F89fD62d530",
+      "note": "created locally; no QOR sent and no key enrolled"
+    }
+  ]
+}
