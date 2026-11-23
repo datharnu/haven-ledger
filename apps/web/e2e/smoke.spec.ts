@@ -12,8 +12,10 @@ for (const width of [390, 1440]) {
 
     await page.getByRole("link", { name: "Check" }).click();
     await expect(page.getByRole("heading", { name: /both lanes/i })).toBeVisible();
-    await expect(page.getByText("Nothing has been read from the testnet yet.")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Verify both lanes" })).toBeVisible();
+    // Two desks: the fUSD ledger's seven scenes and the QOR ledger's six scenes.
+    await expect(page.getByText("Nothing has been read from the testnet yet.")).toHaveCount(2);
+    await expect(page.getByText("Nothing has been read from the testnet yet.").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /Verify/ }).first()).toBeVisible();
     await expect(page.getByRole("heading", { name: "Spoofed receipt example" })).toBeVisible();
     await expect(page.getByText("Rejected: qor143f0ghn8slqguwez73087dvq8lqnuuukqdu9fl is not the ledger", { exact: false })).toBeVisible();
     overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
