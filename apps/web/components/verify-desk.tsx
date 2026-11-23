@@ -2,8 +2,28 @@
 
 import { useEffect, useRef, useState } from "react";
 import scenes from "@/lib/fixtures/scenes.json";
-import { NETWORK, NO_HASH, verifyScene, type Expect, type Outcome, type Verdict } from "@/lib/check";
-import { browserNative, browserRpc } from "@/lib/rpc";
+import { NETWORK, NO_HASH, verifyQorScene, verifyScene, type Expect, type Outcome, type Rpc, type Verdict } from "@/lib/check";
+import { qorScenes } from "@/lib/qor-scenes";
+import { browserBank, browserNative, browserRpc } from "@/lib/rpc";
+
+type Asset = "fusd" | "qor";
+type SceneInput = { scene: number; hash: string | null; expect: Expect };
+
+/** The fUSD scenes are the default. The QOR ledger's scenes come from their own fixture and also read the bank lane. */
+const SOURCES: Record<Asset, { scenes: SceneInput[]; heading: string; button: string; verify: (scene: SceneInput, rpc: Rpc) => Promise<Verdict> }> = {
+  fusd: {
+    scenes: scenes.scenes.map((scene) => ({ scene: scene.scene, hash: scene.hash, expect: scene.expect as Expect })),
+    heading: "Scene",
+    button: "Verify both lanes",
+    verify: (scene, rpc) => verifyScene(scene, rpc, browserNative),
+  },
+  qor: {
+    scenes: qorScenes.scenes.map((scene) => ({ scene: scene.scene, hash: scene.hash, expect: scene.expect })),
+    heading: "QOR scene",
+    button: "Verify the QOR ledger",
+    verify: (scene, rpc) => verifyQorScene(scene, rpc, browserNative, browserBank),
+  },
+};
 
 type Row = {
   scene: number;
@@ -28,8 +48,9 @@ function chipOf(row: Row) {
   return CHIP[row.verdict?.outcome ?? "failed"];
 }
 
-export function VerifyDesk({ autostart }: { autostart: boolean }) {
-  const [rows, setRows] = useState<Row[]>(() => scenes.scenes.map((scene) => ({ scene: scene.scene, hash: scene.hash, state: "idle" })));
+export function VerifyDesk({ autostart, asset = "fusd" }: { autostart: boolean; asset?: Asset }) {
+  const source = SOURCES[asset];
+  const [rows, setRows] = useState<Row[]>(() => source.scenes.map((scene) => ({ scene: scene.scene, hash: scene.hash, state: "idle" })));
   const [running, setRunning] = useState(false);
   const started = useRef(false);
 
@@ -37,13 +58,13 @@ export function VerifyDesk({ autostart }: { autostart: boolean }) {
     if (running) return;
     setRunning(true);
     const rpc = browserRpc();
-    const next = scenes.scenes.map((scene) => ({ scene: scene.scene, hash: scene.hash, state: "idle" as const }));
+    const next = source.scenes.map((scene) => ({ scene: scene.scene, hash: scene.hash, state: "idle" as const }));
     setRows(next);
-    for (let index = 0; index < scenes.scenes.length; index++) {
-      const scene = scenes.scenes[index];
+    for (let index = 0; index < source.scenes.length; index++) {
+      const scene = source.scenes[index];
       if (!scene) continue;
       setRows((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, state: "reading", verdict: undefined } : row)));
-      const verdict = await verifyScene({ scene: scene.scene, hash: scene.hash, expect: scene.expect as Expect }, rpc, browserNative);
+      const verdict = await source.verify(scene, rpc);
       setRows((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, state: "done", verdict } : row)));
     }
     setRunning(false);
@@ -87,7 +108,7 @@ export function VerifyDesk({ autostart }: { autostart: boolean }) {
           disabled={running}
           className="inline-flex h-11 items-center rounded-lg bg-action px-5 text-[15px] font-medium text-on-action transition-opacity hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
         >
-          Verify both lanes
+          {source.button}
         </button>
         {offline.length > 0 && !running ? (
           <button
@@ -109,7 +130,9 @@ export function VerifyDesk({ autostart }: { autostart: boolean }) {
           return (
             <li key={row.scene} className="py-5">
               <div className="flex flex-wrap items-baseline justify-between gap-3">
-                <h2 className="text-[18px] font-medium tracking-[-0.02em] text-ink">Scene {row.scene}</h2>
+                <h2 className="text-[18px] font-medium tracking-[-0.02em] text-ink">
+                  {source.heading} {row.scene}
+                </h2>
                 <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium tracking-[0.04em] uppercase ${chip.className}`}>
                   {chip.label}
                 </span>

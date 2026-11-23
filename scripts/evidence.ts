@@ -15,11 +15,15 @@ import {
   type Address,
   type Hex,
 } from "viem";
-import { PAY, REFUND, argsHash, commitmentOf, noteOf, payoutMessage } from "../src/ts/ledger.js";
+import { NATIVE_QOR, PAY, PAY_QOR, REFUND, REFUND_QOR, argsHash, commitmentOf, noteOf, payoutMessage, qorNoteOf } from "../src/ts/ledger.js";
 import { evmClient } from "./lib/chain.js";
+import { UQOR_WEI, bankDelta } from "./lib/native.js";
+import { QOR_ARTIFACT, QOR_DEPLOY, qorLedgerDoc, qorLedgerExists } from "./lib/qor.js";
 
 const LEDGER_ACCOUNT = "qor1fdhya5x2lxyecp7fjgk7kzu95fgyu6gcs40yzu";
 const compiled = JSON.parse(readFileSync("out/HavenLedger.sol/HavenLedger.json", "utf8")) as { abi: Abi };
+/** Files the native-QOR ledger writes. They are checked against that ledger, never the fUSD one. */
+const QOR_PREFIX = "ledger-qor";
 
 type Doc = Record<string, unknown>;
 type HashRef = { file: string; hash: string; note: string; doc: Doc };
@@ -28,6 +32,19 @@ type LedgerDoc = {
   ledgerAccount: string;
   constructorArgs: { payer: Address; payee: Address; token: Address; receipts: string };
 };
+
+/** What differs between the fUSD ledger and the QOR ledger when a call is re-checked. */
+type Profile = {
+  name: "fUSD" | "QOR";
+  abi: Abi;
+  pay: Hex;
+  refund: Hex;
+  note: (nonce: bigint, commitment: Hex, amount: bigint, memo: string) => string;
+  /** The recipient's qor1 address when the payout must show up as an x/bank uqor change. */
+  bankAccount?: (to: Address) => string;
+};
+
+const FUSD: Profile = { name: "fUSD", abi: compiled.abi, pay: PAY, refund: REFUND, note: (n, c, _amount, memo) => noteOf(n, c, memo) };
 
 const results: { ok: boolean; line: string }[] = [];
 
@@ -55,10 +72,11 @@ function hashesIn(value: unknown, file: string, doc: Doc, note: string, out: Has
   for (const child of Object.values(record)) hashesIn(child, file, doc, localNote, out);
 }
 
-function loadDocs(): { refs: HashRef[]; scene7: boolean } {
+function loadDocs(qor: boolean): { refs: HashRef[]; scene7: boolean } {
   const refs: HashRef[] = [];
   let scene7 = false;
-  for (const name of readdirSync("deployments").filter((file) => file.endsWith(".json")).sort()) {
+  const files = readdirSync("deployments").filter((file) => file.endsWith(".json") && file.startsWith(QOR_PREFIX) === qor);
+  for (const name of files.sort()) {
     const doc = JSON.parse(readFileSync(`deployments/${name}`, "utf8")) as Doc;
     if (name === "scene-7.json") scene7 = true;
     hashesIn(doc, name, doc, "", refs);
@@ -109,11 +127,12 @@ function recordedCall(doc: Doc): { signature?: string; memo?: string } | undefin
   return call as { signature?: string; memo?: string };
 }
 
-async function checkCall(ref: HashRef, ledger: LedgerDoc, pubkey: Uint8Array, chainNonce: bigint): Promise<void> {
+async function checkCall(ref: HashRef, ledger: LedgerDoc, pubkey: Uint8Array, chainNonce: bigint, profile: Profile): Promise<void> {
   const hash = ref.hash as Hex;
   const client = evmClient();
   const tx = await client.getTransaction({ hash });
-  const decoded = decodeFunctionData({ abi: compiled.abi, data: tx.input });
+  if (!tx.to || getAddress(tx.to) !== getAddress(ledger.ledger)) throw new Error(`${hash} is not a call to the ${profile.name} ledger`);
+  const decoded = decodeFunctionData({ abi: profile.abi, data: tx.input });
   if (decoded.functionName !== "pay" && decoded.functionName !== "refund") {
     throw new Error(`${hash} calls ${decoded.functionName}`);
   }
@@ -126,7 +145,7 @@ async function checkCall(ref: HashRef, ledger: LedgerDoc, pubkey: Uint8Array, ch
   if (recorded?.signature && recorded.signature.toLowerCase() !== signature.toLowerCase()) {
     throw new Error(`${hash} calldata signature differs from ${ref.file}`);
   }
-  const action = decoded.functionName === "refund" ? REFUND : PAY;
+  const action = decoded.functionName === "refund" ? profile.refund : profile.pay;
   const to = getAddress(decoded.functionName === "refund" ? ledger.constructorArgs.payer : ledger.constructorArgs.payee);
   const token = getAddress(ledger.constructorArgs.token);
   const ledgerAddress = getAddress(ledger.ledger);
@@ -160,7 +179,7 @@ async function checkCall(ref: HashRef, ledger: LedgerDoc, pubkey: Uint8Array, ch
   for (const log of receipt.logs) {
     if (getAddress(log.address) !== ledgerAddress) continue;
     try {
-      const event = decodeEventLog({ abi: compiled.abi, data: log.data, topics: log.topics });
+      const event = decodeEventLog({ abi: profile.abi, data: log.data, topics: log.topics });
       if (event.eventName !== "Moved") continue;
       const eventArgs = event.args as unknown;
       moved = {
@@ -192,7 +211,7 @@ async function checkCall(ref: HashRef, ledger: LedgerDoc, pubkey: Uint8Array, ch
   if (commitment.toLowerCase() !== moved.commitment.toLowerCase()) throw new Error(`${hash} commitment differs from Moved`);
   const payout = await client.readContract({
     address: ledgerAddress,
-    abi: compiled.abi,
+    abi: profile.abi,
     functionName: "payout",
     args: [signedNonce],
   });
@@ -200,14 +219,23 @@ async function checkCall(ref: HashRef, ledger: LedgerDoc, pubkey: Uint8Array, ch
   const storedReceipt = field(payout, "receiptId", 2);
   if (storedCommitment.toLowerCase() !== commitment.toLowerCase()) throw new Error(`${hash} payout commitment differs`);
   if (storedReceipt !== moved.receiptId) throw new Error(`${hash} payout receipt ${storedReceipt}`);
-  const note = noteOf(signedNonce, commitment, memo);
+  const note = profile.note(signedNonce, commitment, amount, memo);
   const native = await nativeReceipt(ledger.constructorArgs.receipts, BigInt(moved.receiptId));
   if (native.sender !== ledger.ledgerAccount) throw new Error(`${hash} receipt sender ${native.sender}`);
   if (native.note !== note) throw new Error(`${hash} receipt note differs`);
   const filed = ref.doc.receipt as { note?: string } | undefined;
   if (filed?.note && filed.note !== note) throw new Error(`${hash} scene file note differs`);
   if (!note.includes(commitment)) throw new Error(`${hash} note does not carry ${hashed.slice(0, 10)}`);
-  pass(`${hash} ${decoded.functionName} nonce ${signedNonce} receipt ${native.id} args ${hashed.slice(0, 10)} commitment matches`);
+  let bankLine = "";
+  if (profile.bankAccount) {
+    // The Native bank lane: the recipient's x/bank uqor balance across the payout's block.
+    const bank = await bankDelta(profile.bankAccount(to), receipt.blockNumber);
+    if (BigInt(bank.delta) * UQOR_WEI !== amount) {
+      throw new Error(`${hash} bank ${bank.account} changed by ${bank.delta} uqor at ${bank.height}; the payout is ${amount} wei`);
+    }
+    bankLine = ` bank ${bank.account} +${bank.delta} uqor at ${bank.height}`;
+  }
+  pass(`${hash} ${profile.name} ${decoded.functionName} nonce ${signedNonce} receipt ${native.id} args ${hashed.slice(0, 10)} commitment matches${bankLine}`);
 }
 
 function nonceCovered(
@@ -250,18 +278,14 @@ function nonceCovered(
   return found;
 }
 
-async function main(): Promise<void> {
-  const ledger = ledgerDoc();
-  const { refs, scene7 } = loadDocs();
-  if (!scene7) throw new Error("deployments/scene-7.json is missing");
-  pass("Refused before broadcast");
+async function checkRefs(refs: HashRef[], ledger: LedgerDoc, profile: Profile): Promise<void> {
   const client = evmClient();
   const key = await readMlDsaKey(testnetClient(), getAddress(ledger.constructorArgs.payer));
   requireMlDsaKey(key);
   const pubkey = hexToBytes(key.pubkey);
   const chainNonce = (await client.readContract({
     address: getAddress(ledger.ledger),
-    abi: compiled.abi,
+    abi: profile.abi,
     functionName: "nonce",
   })) as bigint;
   for (const ref of refs) {
@@ -274,7 +298,7 @@ async function main(): Promise<void> {
       const receipt = await client.getTransactionReceipt({ hash: ref.hash as Hex });
       if (ref.note === "pay" || ref.note === "refund") {
         if (receipt.status !== "success") throw new Error(`${ref.hash} status ${receipt.status}`);
-        await checkCall(ref, ledger, pubkey, chainNonce);
+        await checkCall(ref, ledger, pubkey, chainNonce, profile);
         continue;
       }
       if (ref.note.startsWith("deploy ")) {
@@ -287,7 +311,7 @@ async function main(): Promise<void> {
       }
       if (ref.note === "refused") {
         if (receipt.status !== "reverted") throw new Error(`${ref.hash} status ${receipt.status}`);
-        await checkCall(ref, ledger, pubkey, chainNonce);
+        await checkCall(ref, ledger, pubkey, chainNonce, profile);
         continue;
       }
       throw new Error(`${ref.hash} note "${ref.note}" is not a known result`);
@@ -296,6 +320,40 @@ async function main(): Promise<void> {
       fail(message.replace(/0x[0-9a-fA-F]{80,}/g, "0x…").split("\n")[0]?.slice(0, 400) ?? "failed");
     }
   }
+}
+
+/** The QOR ledger, only once `deployments/ledger-qor.json` records a finished deploy. */
+async function checkQor(): Promise<void> {
+  if (!qorLedgerExists()) {
+    console.log(`skip  ${QOR_DEPLOY} has no finished QOR ledger`);
+    return;
+  }
+  const qor = qorLedgerDoc();
+  const abi = (JSON.parse(readFileSync(QOR_ARTIFACT, "utf8")) as { abi: Abi }).abi;
+  const ledger: LedgerDoc = {
+    ledger: qor.ledger,
+    ledgerAccount: qor.ledgerAccount,
+    constructorArgs: { payer: qor.payer, payee: qor.payee, token: NATIVE_QOR, receipts: qor.receipts },
+  };
+  const profile: Profile = {
+    name: "QOR",
+    abi,
+    pay: PAY_QOR,
+    refund: REFUND_QOR,
+    note: qorNoteOf,
+    bankAccount: (to) => (getAddress(to) === qor.payer ? qor.payerQor : qor.payeeQor),
+  };
+  const { refs } = loadDocs(true);
+  await checkRefs(refs, ledger, profile);
+}
+
+async function main(): Promise<void> {
+  const ledger = ledgerDoc();
+  const { refs, scene7 } = loadDocs(false);
+  if (!scene7) throw new Error("deployments/scene-7.json is missing");
+  pass("Refused before broadcast");
+  await checkRefs(refs, ledger, FUSD);
+  await checkQor();
   const passed = results.filter((result) => result.ok).length;
   const failed = results.length - passed;
   console.log(`${passed} passed, ${failed} failed`);

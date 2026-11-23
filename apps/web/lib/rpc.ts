@@ -53,3 +53,24 @@ export async function browserNative(id: bigint): Promise<NativeReceipt> {
 }
 
 export const NETWORK_LABEL = NETWORK;
+
+/** Reads one recipient's bank `uqor` balance at a height through this site. */
+export async function browserBank(account: string, height: bigint): Promise<bigint> {
+  let response: Response;
+  try {
+    response = await fetch(`/native-bank/${account}/${height.toString()}`);
+  } catch {
+    throw new NetworkError();
+  }
+  if (response.status === 400) throw new Error("This page will not query that balance.");
+  if (!response.ok) throw new NetworkError();
+  let body: { balance?: { denom?: string; amount?: string } };
+  try {
+    body = (await response.json()) as { balance?: { denom?: string; amount?: string } };
+  } catch {
+    throw new NetworkError();
+  }
+  const amount = body.balance?.amount;
+  if (body.balance?.denom !== "uqor" || typeof amount !== "string" || !/^[0-9]+$/.test(amount)) throw new NetworkError();
+  return BigInt(amount);
+}

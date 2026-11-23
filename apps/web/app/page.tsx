@@ -11,8 +11,10 @@ export default function Home() {
         Paid only when the Native receipt <span className="serif text-muted">names that payout.</span>
       </h1>
       <p className="mt-5 max-w-[58ch] text-[17px] leading-[1.6] text-muted">
-        fUSD leaves only for the two names on the line, only with a fresh ML-DSA-87 signature from the payer, and only
-        together with a receipt in qday-receipts. If either lane refuses, neither changes.
+        A payer pays a contractor in fUSD on the EVM side; an auditor or Cosmos-side app reads the receipt trail on the
+        Native side. Every receipt from the ledger matches a real payout, and every payout has its receipt. fUSD leaves only
+        for the two names on the line, only with a fresh ML-DSA-87 signature from the payer, and only together with a
+        receipt in qday-receipts. If either lane refuses, neither changes.
       </p>
       <div className="mt-8 flex flex-wrap items-center gap-3">
         <Link

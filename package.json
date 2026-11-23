@@ -12,7 +12,11 @@
     "deploy": "tsx scripts/deploy.ts",
     "fund-ledger": "tsx scripts/fund-ledger.ts",
     "scenes": "tsx scripts/scenes.ts",
-    "evidence": "tsx scripts/evidence.ts"
+    "deploy:qor": "tsx scripts/deploy-qor.ts",
+    "fund-ledger:qor": "tsx scripts/fund-ledger-qor.ts",
+    "scenes:qor": "tsx scripts/scenes-qor.ts",
+    "evidence": "tsx scripts/evidence.ts",
+    "reconcile": "tsx scripts/reconcile.ts"
   },
   "dependencies": {
     "@cosmjs/stargate": "0.39.0",

@@ -1,0 +1,12 @@
+{
+  "network": "qorechain-diana",
+  "ok": true,
+  "ledger": "0x087180B80f356AAFB772b091fa7CE5C03675919b",
+  "ledgerAccount": "qor1ppccpwq0x442ldmjkzgl5l89cqm8tyvm3recw3",
+  "from": "qor1fw43p6292ljewm7l2hxtu47jd8v66hmkyajz4q",
+  "amountUqor": "5000000",
+  "hash": "E6FC9770ED1B5EDC8345DAE292815C4BB4D3CD2390CB09F8CCB8B4B8BCC1A9D8",
+  "bankUqor": "5000000",
+  "evmWei": "5000000000000000000",
+  "ranAt": "2026-11-23T11:15:40.904Z"
+}

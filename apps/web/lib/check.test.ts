@@ -223,6 +223,27 @@ describe("recorded replies", () => {
     expect(verdict.outcome).not.toBe("agreed");
   });
 
+  it("shows the sender check on an agreed scene", async () => {
+    const pay = await verifyScene(sceneAt(0), rpc, native);
+    expect(pay.lines.find((line) => line.label === "Native sender")?.detail).toBe(
+      `Matches: ${scenes.ledgerAccount} is the ledger's own qor1 address.`,
+    );
+  });
+
+  it("the right note from the wrong sender is not a pass", async () => {
+    const spoofed = async (id: bigint): Promise<NativeReceipt> => {
+      const row = await native(id);
+      return { ...row, sender: scenes.spike.qor };
+    };
+    for (const index of [0, 5]) {
+      const verdict = await verifyScene(sceneAt(index), rpc, spoofed);
+      expect(verdict.outcome).toBe("failed");
+      expect(verdict.summary).toContain(`The Native sender is ${scenes.spike.qor}, not the ledger.`);
+      expect(verdict.lines.find((line) => line.label === "Native sender")?.detail.startsWith("Rejected:")).toBe(true);
+      expect(verdict.heights).toBeUndefined();
+    }
+  });
+
   it("a network failure is never a pass", async () => {
     const verdict = await verifyScene(sceneAt(0), async () => {
       throw new NetworkError();

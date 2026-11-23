@@ -18,9 +18,13 @@ import {
   type Hex,
 } from "viem";
 import ledgerAbiJson from "./abi/haven-ledger.json";
-import { PAY, REFUND, commitmentOf, encodeAuthMessage, noteOf } from "./ledger";
+import qorLedgerAbiJson from "./abi/haven-ledger-qor.json";
+import { evmToQor } from "./bech32";
+import { NATIVE_QOR, PAY, PAY_QOR, REFUND, REFUND_QOR, UQOR_WEI, commitmentOf, encodeAuthMessage, noteOf, qorNoteOf } from "./ledger";
+import { verifyLedgerReceipt } from "./receipt";
 
 export const ledgerAbi = ledgerAbiJson as Abi;
+export const qorLedgerAbi = qorLedgerAbiJson as Abi;
 
 /** `PqAuth.PQC_STATUS` in `lib/haven-pq-kit/src/PqAuth.sol`. */
 export const PQC_STATUS = "0x0000000000000000000000000000000000000a02" as const;
@@ -74,6 +78,38 @@ export class NetworkError extends Error {
 
 export type NativeReceipt = { id: string; sender: string; note: string; height: string };
 export type ReadNative = (id: bigint) => Promise<NativeReceipt>;
+/** The x/bank `uqor` balance of a `qor1` account after block `height`. */
+export type ReadBank = (account: string, height: bigint) => Promise<bigint>;
+
+/** What differs between the fUSD ledger and the native-QOR ledger. Both share every view and event signature. */
+type Profile = {
+  abi: Abi;
+  pay: Hex;
+  refund: Hex;
+  note: (nonce: bigint, commitment: Hex, amount: bigint, memo: string) => string;
+  amount: (amount: bigint) => string;
+  /** Set for the QOR ledger: the payout must show as the recipient's x/bank uqor change in its block. */
+  bank?: ReadBank;
+};
+
+const FUSD: Profile = {
+  abi: ledgerAbi,
+  pay: PAY,
+  refund: REFUND,
+  note: (nonce, commitment, _amount, memo) => noteOf(nonce, commitment, memo),
+  amount: (amount) => amount.toString(),
+};
+
+function qorProfile(bank: ReadBank): Profile {
+  return {
+    abi: qorLedgerAbi,
+    pay: PAY_QOR,
+    refund: REFUND_QOR,
+    note: qorNoteOf,
+    amount: (amount) => (amount % UQOR_WEI === 0n ? `${(amount / UQOR_WEI).toString()} uqor` : `${amount.toString()} wei`),
+    bank,
+  };
+}
 
 export type Outcome = "agreed" | "refused" | "failed" | "offline" | "no-hash";
 
@@ -140,24 +176,34 @@ async function readView(rpc: Rpc, ledger: Address, name: Parameters<typeof viewD
   return rpcHex(rpc, "eth_call", [{ to: ledger, data: viewData(name, args) }, "latest"]);
 }
 
-function decodeReason(data: Hex): string | null {
+function decodeReason(data: Hex, abi: Abi): string | null {
   try {
-    const decoded = decodeErrorResult({ abi: ledgerAbi, data });
+    const decoded = decodeErrorResult({ abi, data });
     const args = [...(decoded.args ?? [])];
     if (decoded.errorName === "Error") return String(args[0] ?? "Error");
     if (decoded.errorName === "ERC20InsufficientBalance") return `ERC20InsufficientBalance ${args.join(" ")}`;
+    if (decoded.errorName === "InsufficientBalance") return `InsufficientBalance ${args.join(" ")}`;
     return decoded.errorName;
   } catch {
     return null;
   }
 }
 
-export async function verifyScene(scene: Scene, rpc: Rpc, native: ReadNative): Promise<Verdict> {
+export function verifyScene(scene: Scene, rpc: Rpc, native: ReadNative): Promise<Verdict> {
+  return verifyWith(scene, rpc, native, FUSD);
+}
+
+/** A scene of the native-QOR ledger: the same checks, plus the recipient's x/bank uqor change in the payout's block. */
+export function verifyQorScene(scene: Scene, rpc: Rpc, native: ReadNative, bank: ReadBank): Promise<Verdict> {
+  return verifyWith(scene, rpc, native, qorProfile(bank));
+}
+
+async function verifyWith(scene: Scene, rpc: Rpc, native: ReadNative, profile: Profile): Promise<Verdict> {
   if (!scene.hash) {
     return { scene: scene.scene, hash: null, outcome: "no-hash", summary: NO_HASH, lines: [] };
   }
   try {
-    return await checkHash(scene, scene.hash, rpc, native);
+    return await checkHash(scene, scene.hash, rpc, native, profile);
   } catch (error) {
     if (error instanceof NetworkError) return offline(scene);
     const message = error instanceof Error ? error.message : "The check failed.";
@@ -165,7 +211,7 @@ export async function verifyScene(scene: Scene, rpc: Rpc, native: ReadNative): P
   }
 }
 
-async function checkHash(scene: Scene, hash: string, rpc: Rpc, native: ReadNative): Promise<Verdict> {
+async function checkHash(scene: Scene, hash: string, rpc: Rpc, native: ReadNative, profile: Profile): Promise<Verdict> {
   const chainHex = await rpcHex(rpc, "eth_chainId", []);
   if (BigInt(chainHex) !== CHAIN_ID) return failed(scene, "This page checks chain 9800.");
 
@@ -182,7 +228,7 @@ async function checkHash(scene: Scene, hash: string, rpc: Rpc, native: ReadNativ
   const receipt = parseReceipt(receiptRaw);
   if (!tx || !receipt) return failed(scene, "The testnet returned a transaction this page could not read.");
 
-  const decoded = decodeFunctionData({ abi: ledgerAbi, data: tx.input });
+  const decoded = decodeFunctionData({ abi: profile.abi, data: tx.input });
   if (decoded.functionName !== "pay" && decoded.functionName !== "refund") {
     return failed(scene, "This transaction does not call pay or refund.");
   }
@@ -191,7 +237,7 @@ async function checkHash(scene: Scene, hash: string, rpc: Rpc, native: ReadNativ
   const memo = String(args[1]);
   const deadline = args[2] as bigint;
   const signature = args[3] as Hex;
-  const action = decoded.functionName === "refund" ? REFUND : PAY;
+  const action = decoded.functionName === "refund" ? profile.refund : profile.pay;
   const ledger = tx.to;
 
   const payer = getAddress(decodeFunctionResult({ abi: ledgerAbi, functionName: "payer", data: await readView(rpc, ledger, "payer") }) as Address);
@@ -201,6 +247,7 @@ async function checkHash(scene: Scene, hash: string, rpc: Rpc, native: ReadNativ
   const ledgerAccount = String(decodeFunctionResult({ abi: ledgerAbi, functionName: "ledgerAccount", data: await readView(rpc, ledger, "ledgerAccount") }));
   const chainNonce = BigInt(String(decodeFunctionResult({ abi: ledgerAbi, functionName: "nonce", data: await readView(rpc, ledger, "nonce") })));
   const to = decoded.functionName === "refund" ? payer : payee;
+  if (profile.bank && token !== NATIVE_QOR) return failed(scene, "This ledger does not pay native QOR.");
 
   const keyRaw = await rpcHex(rpc, "eth_call", [{ to: PQC_STATUS, data: keyData(payer) }, "latest"]);
   const key = decodeKey(keyRaw);
@@ -209,7 +256,7 @@ async function checkHash(scene: Scene, hash: string, rpc: Rpc, native: ReadNativ
   const signedNonce = nonceCovered(key, { chainId: CHAIN_ID, ledger, payer, action, deadline, to, token, amount, memo, signature, chainNonce });
   const lines: Verdict["lines"] = [
     { label: "Transaction", detail: `${receipt.status} at block ${BigInt(receipt.blockNumber).toString()}` },
-    { label: "Call", detail: `${decoded.functionName} ${amount.toString()}${memo ? ` · ${memo}` : ""}` },
+    { label: "Call", detail: `${decoded.functionName} ${profile.amount(amount)}${memo ? ` · ${memo}` : ""}` },
     {
       label: "Signature",
       detail: signedNonce === undefined ? "The signature does not verify." : `The signature verifies at nonce ${signedNonce.toString()}.`,
@@ -226,7 +273,7 @@ async function checkHash(scene: Scene, hash: string, rpc: Rpc, native: ReadNativ
 
   if (receipt.status === "reverted") {
     if (expect.outcome !== "refused") return failed(scene, "This scene was recorded as a payout, and the transaction reverted.", lines);
-    const reason = await revertReason(rpc, tx, receipt.blockNumber);
+    const reason = await revertReason(rpc, tx, receipt.blockNumber, profile.abi);
     if (!reason.includes(expect.reason)) {
       return failed(scene, `Refused for a different reason than recorded: ${reason}`, lines);
     }
@@ -241,7 +288,7 @@ async function checkHash(scene: Scene, hash: string, rpc: Rpc, native: ReadNativ
 
   if (expect.outcome !== "agreed") return failed(scene, "This scene was recorded as a refusal, and the transaction succeeded.", lines);
   if (signedNonce === undefined) return failed(scene, "The signature does not verify.", lines);
-  const moved = movedFrom(receipt.logs, ledger);
+  const moved = movedFrom(receipt.logs, ledger, profile.abi);
   if (!moved) return failed(scene, "The receipt has no Moved event.", lines);
   if (BigInt(moved.id) !== signedNonce) return failed(scene, "The signature nonce is not the payout id.", lines);
   if (getAddress(moved.to) !== to) return failed(scene, "Moved names a different recipient.", lines);
@@ -258,16 +305,36 @@ async function checkHash(scene: Scene, hash: string, rpc: Rpc, native: ReadNativ
   if (storedReceipt !== moved.receiptId) return failed(scene, "The stored receipt id does not match Moved.", lines);
   if (receipts !== RECEIPTS) return failed(scene, "This ledger names a different receipt book, so this page will not read it.", lines);
 
-  const note = noteOf(signedNonce, commitment, memo);
+  const note = profile.note(signedNonce, commitment, amount, memo);
   const row = await native(BigInt(storedReceipt));
-  if (row.sender !== ledgerAccount) return failed(scene, `The Native sender is ${row.sender}.`, lines);
-  if (row.note !== note) return failed(scene, "The Native note does not match this payout.", lines);
-  if (row.height !== storedNative) return failed(scene, "The Native receipt height does not match the stored payout.", lines);
+  // Anyone can write to qday-receipts. Only a receipt whose sender is the ledger's own qor1 counts.
+  const check = verifyLedgerReceipt(row, ledgerAccount, { id: storedReceipt, note, height: storedNative });
+  const sender = check.checks[0];
+  if (sender) lines.push({ label: "Native sender", detail: `${sender.ok ? "Matches" : "Rejected"}: ${sender.detail}` });
+  if (!check.ok) {
+    if (!sender?.ok) return failed(scene, `The Native sender is ${row.sender}, not the ledger. ${check.reason}`, lines);
+    if (row.note !== note) return failed(scene, "The Native note does not match this payout.", lines);
+    if (row.height !== storedNative) return failed(scene, "The Native receipt height does not match the stored payout.", lines);
+    return failed(scene, check.reason, lines);
+  }
 
   lines.push(
     { label: "Commitment", detail: commitment },
     { label: "Native receipt", detail: `${row.id} from ${row.sender}` },
   );
+  if (profile.bank) {
+    // The Native bank lane: the recipient's x/bank uqor balance across the payout's block.
+    const block = BigInt(receipt.blockNumber);
+    const account = evmToQor(to);
+    const [before, after] = await Promise.all([profile.bank(account, block - 1n), profile.bank(account, block)]);
+    const delta = after - before;
+    const who = decoded.functionName === "refund" ? "payer" : "payee";
+    const sign = delta < 0n ? "" : "+";
+    lines.push({ label: "Native bank", detail: `${who} ${sign}${delta.toString()} uqor at height ${block.toString()} (${account})` });
+    if (delta * UQOR_WEI !== amount) {
+      return failed(scene, `The Native bank change is ${sign}${delta.toString()} uqor, and the payout is ${profile.amount(amount)}.`, lines);
+    }
+  }
   return {
     scene: scene.scene,
     hash,
@@ -329,12 +396,12 @@ function nonceCovered(
   return found;
 }
 
-async function revertReason(rpc: Rpc, tx: Tx, block: Hex): Promise<string> {
+async function revertReason(rpc: Rpc, tx: Tx, block: Hex, abi: Abi): Promise<string> {
   try {
     await rpc("eth_call", [{ from: tx.from, to: tx.to, data: tx.input }, block]);
     return "The receipt reverted.";
   } catch (error) {
-    if (error instanceof CallError && error.data) return decodeReason(error.data) ?? "The receipt reverted.";
+    if (error instanceof CallError && error.data) return decodeReason(error.data, abi) ?? "The receipt reverted.";
     return "The receipt reverted.";
   }
 }
@@ -375,11 +442,11 @@ function parseReceipt(value: unknown): Receipt | null {
   return { status: status === "0x1" ? "success" : "reverted", blockNumber, logs };
 }
 
-function movedFrom(logs: Log[], ledger: Address): Record<string, string> | null {
+function movedFrom(logs: Log[], ledger: Address, abi: Abi): Record<string, string> | null {
   for (const log of logs) {
     if (log.address !== ledger) continue;
     try {
-      const event = decodeEventLog({ abi: ledgerAbi, data: log.data, topics: log.topics });
+      const event = decodeEventLog({ abi, data: log.data, topics: log.topics });
       if (event.eventName !== "Moved") continue;
       const eventArgs = event.args as unknown;
       return {

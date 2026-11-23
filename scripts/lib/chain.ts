@@ -40,9 +40,10 @@ function artifactErrors(path: string): Abi {
   return artifact.abi.filter((item) => item.type === "error");
 }
 
-/** Ledger, Native receipt, and PqAuth errors from the compiled ABI, plus `Error(string)`. */
+/** Ledger (fUSD and QOR), Native receipt, and PqAuth errors from the compiled ABIs, plus `Error(string)`. */
 const KNOWN_ERRORS: Abi = [
   ...artifactErrors("out/HavenLedger.sol/HavenLedger.json"),
+  ...artifactErrors("out/HavenLedgerQor.sol/HavenLedgerQor.json"),
   ERROR_STRING,
 ];
 

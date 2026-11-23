@@ -97,3 +97,19 @@ export function encodeAuthMessage(fields: {
     ],
   );
 }
+
+/** `HavenLedgerQor.PAY` and `REFUND`. Not the fUSD actions, so one asset's signature never moves the other. */
+export const PAY_QOR: Hex = keccak256(toBytes("haven-ledger.qor.pay"));
+export const REFUND_QOR: Hex = keccak256(toBytes("haven-ledger.qor.refund"));
+/** `HavenLedgerQor.token()`: native QOR stands where the fUSD ledger puts its ERC-20. */
+export const NATIVE_QOR: Address = "0x0000000000000000000000000000000000000000";
+/** One bank `uqor` in EVM wei. */
+export const UQOR_WEI = 1_000_000_000_000n;
+
+/** The note `HavenLedgerQor.noteOf` builds: the fUSD note with ` a=<uqor>uqor` before the memo. */
+export function qorNoteOf(nonce: bigint, commitment: Hex, amountWei: bigint, memo: string): string {
+  if (amountWei % UQOR_WEI !== 0n) throw new Error(`${amountWei} wei is not a whole uqor`);
+  const base = `haven-ledger v1 n=${nonce.toString()} c=${commitment} a=${(amountWei / UQOR_WEI).toString()}uqor`;
+  if (memo.length === 0) return base;
+  return `${base} m=${memo}`;
+}

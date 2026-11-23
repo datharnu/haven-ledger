@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { Address, Hex } from "viem";
-import { PAY, argsHash, commitmentOf, noteOf, payoutMessage, recordPayload } from "./ledger.js";
+import {
+  NATIVE_QOR,
+  PAY,
+  PAY_QOR,
+  REFUND,
+  REFUND_QOR,
+  argsHash,
+  commitmentOf,
+  noteOf,
+  payoutMessage,
+  qorNoteOf,
+  recordPayload,
+} from "./ledger.js";
 
 const LEDGER = "0x3333333333333333333333333333333333333333" as Address;
 const PAYER = "0x1111111111111111111111111111111111111111" as Address;
@@ -49,5 +61,26 @@ describe("ledger vectors", () => {
       }),
     ).toBe(MESSAGE);
     expect(recordPayload(NOTE)).toBe(`0x${Buffer.from(`{"record":{"note":"${NOTE}"}}`, "utf8").toString("hex")}`);
+  });
+});
+
+/** The same vectors `test/HavenLedgerQor.t.sol` checks against the contract. */
+describe("QOR ledger vectors", () => {
+  const ONE_QOR = 1_000_000_000_000_000_000n;
+  const QOR_COMMITMENT = "0x0ed7c205df59d8f54fc83b4a13ad204e6b0f92823eddcf7838afad6cdb3f95ca" as Hex;
+
+  it("rebuilds the bytes the contract builds", () => {
+    expect(PAY_QOR).toBe("0x16f937ef09f1c1944047c2812b86083a9be667bf35922dbfc47408f135508e96");
+    expect(argsHash(PAYEE, NATIVE_QOR, ONE_QOR, MEMO)).toBe("0xbb88ae558f7a4fb8c4feb93576543904d95dc5857b6680b4260bc8b2f3399017");
+    expect(
+      commitmentOf({ chainId: 9800n, ledger: LEDGER, action: PAY_QOR, to: PAYEE, token: NATIVE_QOR, amount: ONE_QOR, nonce: 0n, signature: SIGNATURE }),
+    ).toBe(QOR_COMMITMENT);
+    expect(qorNoteOf(0n, QOR_COMMITMENT, ONE_QOR, MEMO)).toBe(`haven-ledger v1 n=0 c=${QOR_COMMITMENT} a=1000000uqor m=invoice 1`);
+    expect(qorNoteOf(2n, QOR_COMMITMENT, 1_000_000_000_000n, "")).toBe(`haven-ledger v1 n=2 c=${QOR_COMMITMENT} a=1uqor`);
+  });
+
+  it("keeps the two assets' actions apart and refuses a fractional uqor", () => {
+    expect(new Set([PAY, REFUND, PAY_QOR, REFUND_QOR]).size).toBe(4);
+    expect(() => qorNoteOf(0n, QOR_COMMITMENT, 1n, "")).toThrow("not a whole uqor");
   });
 });

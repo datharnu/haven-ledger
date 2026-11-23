@@ -14,6 +14,8 @@ for (const width of [390, 1440]) {
     await expect(page.getByRole("heading", { name: /both lanes/i })).toBeVisible();
     await expect(page.getByText("Nothing has been read from the testnet yet.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Verify both lanes" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Spoofed receipt example" })).toBeVisible();
+    await expect(page.getByText("Rejected: qor143f0ghn8slqguwez73087dvq8lqnuuukqdu9fl is not the ledger", { exact: false })).toBeVisible();
     overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
   });

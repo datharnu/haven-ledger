@@ -61,3 +61,13 @@ From an EVM transaction alone:
 - A balance cap or a schedule. The payer signs each payout.
 - A way to change payer, payee, token or target.
 - Any call from Haven Escrow or Haven Steward. They do not use the ledger.
+
+## HavenLedgerQor (native QOR)
+
+`src/HavenLedgerQor.sol` follows the steps above with these differences. On 23 November 2026 it is deployed at `0x087180B80f356AAFB772b091fa7CE5C03675919b` (`qor1ppccpwq0x442ldmjkzgl5l89cqm8tyvm3recw3`).
+
+- Asset: native QOR, the chain's bank coin. The EVM sees it in wei (18 decimals); x/bank sees `uqor` (6 decimals); 1 uqor = 1e12 wei. `amount` is in wei and must be a whole number of uqor, or the call reverts `NotWholeUqor`, so the bank balance moves by exactly `amount / 1e12` uqor.
+- Actions: `haven-ledger.qor.pay` and `haven-ledger.qor.refund`. In `argsHash` and the commitment the token is `address(0)`. With the contract address also inside the signed message, a signature for the fUSD ledger cannot be used here and vice versa.
+- Note: `haven-ledger v1 n=<nonce> c=0x<commitment> a=<N>uqor`, then ` m=<memo>` if there is a memo. With 1 uqor the note is 96 characters, so a memo can be at most 41 before the Native 140-character limit refuses it.
+- Step 9 becomes: check `address(this).balance >= amount` (else `InsufficientBalance(held, needed)`), then `to.call{value: amount}("")` (else `TransferFailed`). Both come after the Native receipt is written and the payout is stored, so a short balance or a recipient that refuses QOR undoes the receipt too. The `lock` modifier stops a reentrant pay or refund.
+- Funding: `receive()` is payable and emits `Funded`; a plain bank `MsgSend` to the contract's `qor1` address also works (recorded fund tx `E6FC9770…`).

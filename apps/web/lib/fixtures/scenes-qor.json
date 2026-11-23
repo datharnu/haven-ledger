@@ -1,0 +1,82 @@
+{
+  "recordedOn": "23 November 2026",
+  "network": "qorechain-diana",
+  "chainId": 9800,
+  "ledger": "0x087180B80f356AAFB772b091fa7CE5C03675919b",
+  "ledgerAccount": "qor1ppccpwq0x442ldmjkzgl5l89cqm8tyvm3recw3",
+  "payer": {
+    "qor": "qor1fw43p6292ljewm7l2hxtu47jd8v66hmkyajz4q",
+    "evm": "0x4bAb10E94557E5976FDf55cCbe57D269d9Ad5f76"
+  },
+  "payee": {
+    "qor": "qor1yfs8uxwhq9ammnu5eeafk3r0387k94fs82n86g",
+    "evm": "0x22607e19d7017bBdCf94Ce7a9B446F89fD62d530"
+  },
+  "receipts": "qor1xjayq5ev55tkzpml9klxwyshr7gdrha0nurha9jhm0f0gdckksgs3gltw8",
+  "scenes": [
+    {
+      "scene": 1,
+      "title": "Pay the payee 1 QOR",
+      "hash": "0xc41d45e30ce0cd081351aaefe6b50a494c40fd1b2a38b7cc44cbf88c0af0aa3e",
+      "record": "Receipt 11 at height 10611180. Count 10 to 11. Native bank qor1yfs8uxwhq9ammnu5eeafk3r0387k94fs82n86g +1000000 uqor.",
+      "expect": {
+        "outcome": "agreed",
+        "signedNonce": 0
+      }
+    },
+    {
+      "scene": 2,
+      "title": "A note the receipt book refuses",
+      "hash": "0x78d7e94ca52f2bdbb647907f3e31699bd79426dd8c37bea2f3b83b372c52d5ec",
+      "record": "Reverted. Count stayed 11. Error cross-VM call failed: the note must be 1 to 140 characters: execute wasm contract failed: CosmWasm contract execution failed",
+      "expect": {
+        "outcome": "refused",
+        "reason": "the note must be 1 to 140 characters",
+        "signedNonce": 1
+      }
+    },
+    {
+      "scene": 3,
+      "title": "More QOR than the ledger holds",
+      "hash": "0x73bc77241f860c4d809f9318085a756b181108b8f06b530a3070951fb23c2532",
+      "record": "Reverted. Count stayed 11. InsufficientBalance 4000000000000000000 10000000000000000000",
+      "expect": {
+        "outcome": "refused",
+        "reason": "InsufficientBalance",
+        "signedNonce": 1
+      }
+    },
+    {
+      "scene": 4,
+      "title": "A signature that is not the payer's",
+      "hash": "0xaadc1aa080648f969b263917449727d75b4c3d633e76d0b55cff12bc0fe132f9",
+      "record": "Reverted. Count stayed 11. SignatureInvalid SignatureInvalid",
+      "expect": {
+        "outcome": "refused",
+        "reason": "SignatureInvalid",
+        "signedNonce": null
+      }
+    },
+    {
+      "scene": 5,
+      "title": "The first signature, sent again",
+      "hash": "0xb2b5fb42b3401c58f698d109eb4b01ccffe5d83790be9a7933144efcda360a77",
+      "record": "Reverted. Count stayed 11. SignatureInvalid SignatureInvalid",
+      "expect": {
+        "outcome": "refused",
+        "reason": "SignatureInvalid",
+        "signedNonce": 0
+      }
+    },
+    {
+      "scene": 6,
+      "title": "Refund the payer 2 QOR",
+      "hash": "0xfaf94ebef57f91fda050b954c6437739e344696167b7cc5c68dd6c18554e7433",
+      "record": "Receipt 12 at height 10611272. Count 11 to 12. Native bank qor1fw43p6292ljewm7l2hxtu47jd8v66hmkyajz4q +2000000 uqor.",
+      "expect": {
+        "outcome": "agreed",
+        "signedNonce": 1
+      }
+    }
+  ]
+}
