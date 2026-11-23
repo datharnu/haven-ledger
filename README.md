@@ -11,11 +11,9 @@ A payer funds a ledger with 1.000000 fUSD. When the payer signs a 0.100000 fUSD 
 [Demo video (2:46)](https://drive.google.com/file/d/1YuR6Qxvw3hu0RyfVZHXfCtITZ4FG69k4/view) · [Live demo](https://haven-ledger-nine.vercel.app) · [Judge in 5 minutes](#judge-it-in-5-minutes) · [Run locally](#run-locally) · [What works today](#what-works-today)
 
 <p align="center">
-  <a href="https://drive.google.com/file/d/1YuR6Qxvw3hu0RyfVZHXfCtITZ4FG69k4/view"><img src="docs/video-thumb.jpg" width="720" alt="Haven Ledger demo video (2:46): click to watch on Google Drive" /></a>
-</p>
-
-<p align="center">
-  <a href="https://haven-ledger-nine.vercel.app"><img src="docs/screen-home.png" width="880" alt="Haven Ledger home screen showing 'Paid only when the Native receipt names that payout' with Verify both lanes button." /></a>
+  <a href="https://drive.google.com/file/d/1YuR6Qxvw3hu0RyfVZHXfCtITZ4FG69k4/view"><img src="docs/screen-home.png" width="880" alt="Watch the Haven Ledger demo" /></a>
+  <br />
+  <sub><a href="https://drive.google.com/file/d/1YuR6Qxvw3hu0RyfVZHXfCtITZ4FG69k4/view">▶ Watch demo (2:46)</a></sub>
 </p>
 
 | Tested on QoreChain Diana (22 Nov 2026) | Result |
