@@ -8,7 +8,11 @@ The reader on the Native side does not have to trust the payer, the relayer, or 
 
 A payer funds a ledger with 1.000000 fUSD. When the payer signs a 0.100000 fUSD payout, the EVM transfer and Native receipt #4 land together in the same block — and when a note exceeds `qday-receipts`'s 140-character Native limit or the balance is short (5.00 against 0.90), both lanes roll back together and 0.000000 fUSD moves.
 
-[Live demo](https://haven-ledger-nine.vercel.app) · [Judge in 5 minutes](#judge-it-in-5-minutes) · [Run locally](#run-locally) · [What works today](#what-works-today)
+[Demo video (2:46)](https://drive.google.com/file/d/1YuR6Qxvw3hu0RyfVZHXfCtITZ4FG69k4/view) · [Live demo](https://haven-ledger-nine.vercel.app) · [Judge in 5 minutes](#judge-it-in-5-minutes) · [Run locally](#run-locally) · [What works today](#what-works-today)
+
+<p align="center">
+  <a href="https://drive.google.com/file/d/1YuR6Qxvw3hu0RyfVZHXfCtITZ4FG69k4/view"><img src="docs/video-thumb.jpg" width="720" alt="Haven Ledger demo video (2:46): click to watch on Google Drive" /></a>
+</p>
 
 <p align="center">
   <a href="https://haven-ledger-nine.vercel.app"><img src="docs/screen-home.png" width="880" alt="Haven Ledger home screen showing 'Paid only when the Native receipt names that payout' with Verify both lanes button." /></a>
@@ -163,7 +167,7 @@ Built for Build Before Q-Day (`https://build.qorechain.io/`), category bounty Cr
 | A working EVM-to-Native call to an approved Native contract | `HavenLedger` (fUSD) and `HavenLedgerQor` (native QOR) call governance-approved `qday-receipts` via bridge precompile `0x…0901` and verify the ledger's own `qor1` sender in the reply ([addresses](#evidence-testnet-addresses)). | Targets existing governance-approved `qday-receipts` rather than deploying a new Native contract (new Native contracts require governance). |
 | Atomic execution shown on testnet | Scenes 1 and 6 land EVM transfers and Native receipts together; Scenes 2 and 3 prove rollback from both Native and EVM refusals ([all 7 scenes](#evidence-deploy-fund-and-all-seven-scenes-22-november-2026)). The QOR ledger repeats this with the payout landing in the payee's Native bank balance in the same transaction ([6 QOR scenes](#evidence-qor-ledger-23-november-2026)). | Scene 8 (window hiding the bridge) was skipped because `eth_call` cannot preview it and a live broadcast would have executed a valid payout. |
 | Public GitHub repository under MIT or Apache-2.0 | `https://github.com/datharnu/haven-ledger`, Apache-2.0 (`LICENSE`). | Deployed bytecode is not verified against source on the explorer (`foundry.toml` has compiler settings). |
-| README, testnet addresses, and video (up to 3 min) | This single-file `README.md` holds all addresses, hashes, and limits; shot list in `docs/DEMO.md`; cover in `docs/cover.png`. | Video recorded (2:46); link not yet added to the project page; `docs/cover.png` not yet uploaded there either. |
+| README, testnet addresses, and video (up to 3 min) | This single-file `README.md` holds all addresses, hashes, and limits; shot list in `docs/DEMO.md`; cover in `docs/cover.png`. | [Demo video](https://drive.google.com/file/d/1YuR6Qxvw3hu0RyfVZHXfCtITZ4FG69k4/view) (2:46). Motion-graphics explainer built from the recorded evidence, with synthetic narration (ElevenLabs); not a screen recording of a live session. `docs/cover.png` not yet uploaded to the project page. |
 
 ---
 
@@ -242,7 +246,7 @@ Do not re-run `npm run deploy`, `npm run fund-account`, `npm run fund-ledger`, o
 
 ## Roadmap
 
-1. Before 2 December 2026: record and publish the ≤3-minute demo film (`docs/DEMO.md`) and upload `docs/cover.png` to the project page.
+1. Before 2 December 2026: upload `docs/cover.png` to the project page. The [demo video](https://drive.google.com/file/d/1YuR6Qxvw3hu0RyfVZHXfCtITZ4FG69k4/view) (2:46) is done.
 2. External audit: audit `HavenLedger.sol`, `NativeReceipt.sol`, and `Bech32.sol` before real-value use.
 3. Mainnet: deploy on QoreChain mainnet once Cross-VM bridge `0x…0901` and a governance-approved receipt contract are live on mainnet.
 
@@ -259,6 +263,8 @@ Credits: `@qorechain/sdk` 0.14.0, `@qorechain/evm` 0.14.0, `@qorechain/pqc` 0.2.
 ## AI disclosure
 
 Commits `62e1293`, `4136809`, `c235e16`, `06f032b`, and `1773ea3` (22 Nov 2026) and initial docs were written in Cursor with Grok 4.7 under human direction; later README restructuring used Antigravity. The use-case opening, the Native-reader section, `verifyLedgerReceipt`, the spoofed-receipt example on `/verify`, `npm run reconcile`, and their tests were added on 23 November 2026 with Claude Code (Claude Opus) under human direction. Human decisions included the single atomic two-name rule, targeting governance-approved `qday-receipts`, keeping the 140-character limit on the Native side so Scene 2 proves Native rollback, using Spike as a zero-authority relayer, avoiding a Pool 2 swap, and skipping Scene 8.
+
+The demo video (23 November 2026) was built in Remotion with Claude Code (Claude Opus 5.5) from this README's recorded evidence, and the human reviewed and approved every script. Its narration is a synthetic ElevenLabs voice; the background track is Mixkit's "Vastness".
 
 ---
 

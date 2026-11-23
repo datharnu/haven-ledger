@@ -6,7 +6,7 @@ Paste-ready text for the project page. Every address and hash below is copied fr
 
 A payer pays a contractor or grantee in fUSD on QoreChain's EVM side; an auditor or a Cosmos-side app reads the payment trail on the Native side. Haven Ledger keeps the two from ever disagreeing. Each payout needs a fresh ML-DSA-87 signature from the payer, can go only to the payee or payer fixed at creation, and, in the same EVM call, writes a receipt into the governance-approved Native CosmWasm contract `qday-receipts` through the Cross-VM bridge precompile `0x…0901`. If either lane refuses, neither changes. Receipts are written by the ledger's own derived `qor1` address, so a reader who keeps only that sender gets exactly the payout list. Rollback is proven live, not just in tests: on Diana testnet (22 November 2026) a Native-side refusal reverted the EVM call, and an EVM transfer failure undid a Native receipt that had already been written. Plus two atomic payouts, junk-signature and replay refusals, and a bridge refusal before broadcast. A second contract, HavenLedgerQor, pays native QOR, so each payout also raises the payee's Native bank balance in the same transaction as the receipt (1 QOR → +1,000,000 uqor with receipt #11, 23 November 2026).
 
-Live verifier: https://haven-ledger-nine.vercel.app/verify · Code: https://github.com/datharnu/haven-ledger (Apache-2.0)
+Video (2:46): https://drive.google.com/file/d/1YuR6Qxvw3hu0RyfVZHXfCtITZ4FG69k4/view · Live verifier: https://haven-ledger-nine.vercel.app/verify · Code: https://github.com/datharnu/haven-ledger (Apache-2.0)
 
 ## Contracts (`qorechain-diana`, EVM chain ID 9800)
 
