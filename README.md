@@ -136,7 +136,7 @@ Everything below runs on QoreChain Diana (`qorechain-diana`, EVM chain ID `9800`
    forge build && forge test
    npm run typecheck && npm run test:ts
    ```
-   Runs 32 Foundry tests (see [Evidence: Foundry tests, fuzzing, and invariants](#evidence-foundry-tests-fuzzing-and-invariants)) and 13 TypeScript tests; `cd apps/web && npm run test:unit` runs 17 more for the web verifier.
+   Runs 67 Foundry tests (see [Evidence: Foundry tests, fuzzing, and invariants](#evidence-foundry-tests-fuzzing-and-invariants)) and 13 TypeScript tests; `cd apps/web && npm run test:unit` runs 17 more for the web verifier.
 4. Receipt ↔ payout reconciliation (read-only, no keys): `npm run reconcile` lists every `qday-receipts` receipt, keeps only those from the ledger's `qor1` address, and matches them both ways against `payout(i)` and the `Moved` events. On 23 November 2026 it printed `2 matched, 0 mismatched, 5 receipts from other senders ignored`.
 
 ---
@@ -163,7 +163,7 @@ Built for Build Before Q-Day (`https://build.qorechain.io/`), category bounty Cr
 | A working EVM-to-Native call to an approved Native contract | `HavenLedger` (fUSD) and `HavenLedgerQor` (native QOR) call governance-approved `qday-receipts` via bridge precompile `0x…0901` and verify the ledger's own `qor1` sender in the reply ([addresses](#evidence-testnet-addresses)). | Targets existing governance-approved `qday-receipts` rather than deploying a new Native contract (new Native contracts require governance). |
 | Atomic execution shown on testnet | Scenes 1 and 6 land EVM transfers and Native receipts together; Scenes 2 and 3 prove rollback from both Native and EVM refusals ([all 7 scenes](#evidence-deploy-fund-and-all-seven-scenes-22-november-2026)). The QOR ledger repeats this with the payout landing in the payee's Native bank balance in the same transaction ([6 QOR scenes](#evidence-qor-ledger-23-november-2026)). | Scene 8 (window hiding the bridge) was skipped because `eth_call` cannot preview it and a live broadcast would have executed a valid payout. |
 | Public GitHub repository under MIT or Apache-2.0 | `https://github.com/datharnu/haven-ledger`, Apache-2.0 (`LICENSE`). | Deployed bytecode is not verified against source on the explorer (`foundry.toml` has compiler settings). |
-| README, testnet addresses, and video (up to 3 min) | This single-file `README.md` holds all addresses, hashes, and limits; shot list in `docs/DEMO.md`; cover in `docs/cover.png`. | Film not recorded yet; `docs/cover.png` not yet uploaded to the project page. |
+| README, testnet addresses, and video (up to 3 min) | This single-file `README.md` holds all addresses, hashes, and limits; shot list in `docs/DEMO.md`; cover in `docs/cover.png`. | Video recorded (2:46); link not yet added to the project page; `docs/cover.png` not yet uploaded there either. |
 
 ---
 
@@ -236,7 +236,7 @@ Do not re-run `npm run deploy`, `npm run fund-account`, `npm run fund-ledger`, o
 | `apps/web/` | Next.js app (`/` record, `/verify` live dual-lane verifier with sender check and spoofed-receipt example at `https://haven-ledger-nine.vercel.app`); `lib/receipt.ts` is a tested copy of `src/ts/receipt.ts` |
 | `scripts/` | Deploy, fund, 7 fUSD scenes; `deploy-qor.ts`, `fund-ledger-qor.ts`, `scenes-qor.ts` (6 QOR scenes, plan by default, `--broadcast` to send); `evidence.ts` (47 checks); `reconcile.ts` (read-only receipt ↔ payout ↔ bank match) |
 | `deployments/` | Recorded testnet JSON hashes and preflight `eth_call` output |
-| `test/` | 32 Foundry unit, fuzz, invariant, and vector tests |
+| `test/` | 67 Foundry unit, fuzz, invariant, and vector tests (`HavenLedger` and `HavenLedgerQor`) |
 
 ---
 
@@ -350,11 +350,19 @@ After funding, the ledger's bank balance was 5,000,000 uqor and its EVM balance 
 
 ## Evidence: Foundry tests, fuzzing, and invariants
 
-Recorded in `.gas-snapshot` (22 Nov 2026): 32 Foundry tests passed, 0 failed.
+On 23 November 2026 `forge test` printed 67 passed, 0 failed, across 7 suites. Forge counts each invariant suite as one test; each suite checks two invariants, all listed as `[PASS]`. The `.gas-snapshot` of 22 November recorded the first 32, before the `HavenLedgerQor` suites were added.
 
-- 26 unit and vector tests: Bech32 derivation, constructor guards, atomic pay/refund, Native refusal rollback, EVM transfer refusal rollback, strict reply validation, replay/wrong-signer/expired-deadline refusals, and `VectorsTest`.
+`HavenLedger` (32, as recorded on 22 November):
+
+- 26 unit tests (`test/HavenLedger.t.sol`): Bech32 derivation, constructor guards, atomic pay/refund, Native refusal rollback, EVM transfer refusal rollback, strict reply validation, replay/wrong-signer/expired-deadline refusals; plus 1 byte-vector test (`VectorsTest`).
 - 4 fuzz tests (256 runs each): `testFuzz_pay_aNoteOverTheNativeLimitMovesNothing`, `testFuzz_pay_anyFundedAmountWritesOneReceiptAndPaysThePayee`, `testFuzz_pay_anyOtherSignatureIsRefused`, `testFuzz_reply_rejectsAnyChangedByte`.
-- 2 invariant tests (64 runs, 2,560 calls each, 0 reverts): `invariant_fundsGoOnlyToPayerOrPayee`, `invariant_onePayoutPerNativeReceipt`.
+- 1 invariant suite with 2 invariants (64 runs, 2,560 calls each, 0 reverts): `invariant_fundsGoOnlyToPayerOrPayee`, `invariant_onePayoutPerNativeReceipt`.
+
+`HavenLedgerQor` (35, added 23 November):
+
+- 30 unit tests (`test/HavenLedgerQor.t.sol`).
+- 4 fuzz tests (256 runs each): `testFuzz_pay_aNoteOverTheNativeLimitMovesNothing`, `testFuzz_pay_anAmountThatIsNotWholeUqorIsRefused`, `testFuzz_pay_anyOtherSignatureIsRefused`, `testFuzz_pay_anyWholeUqorAmountWritesOneReceiptAndPaysThePayeeExactly`.
+- 1 invariant suite with 2 invariants: `invariant_qorGoesOnlyToPayerOrPayee`, `invariant_onePayoutPerNativeReceipt`.
 
 ---
 
