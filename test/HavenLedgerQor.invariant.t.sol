@@ -31,8 +31,33 @@ contract QorHandler is Test {
         payer = ledger_.payer();
     }
 
+    /// Every run begins with one honest payment, so each run checks the invariants over real payouts and
+    /// proves the honest path still works. `pay` is not wrapped in try: if it reverts, `moved` stays 0 and
+    /// `afterInvariant` fails the run.
+    modifier primed() {
+        if (moved == 0) {
+            uint256 amount = 1_000 * UQOR;
+            uint256 deadline = block.timestamp + 1 hours;
+            bytes memory sig = PqTestKeys.sign(
+                payer,
+                PqAuth.encodeMessage(
+                    block.chainid,
+                    address(ledger),
+                    payer,
+                    ledger.PAY(),
+                    ledger.nonce(),
+                    deadline,
+                    ledger.argsHash(ledger.payee(), amount, "")
+                )
+            );
+            ledger.pay(amount, "", deadline, sig);
+            moved++;
+        }
+        _;
+    }
+
     /// `fraction` (one call in four) makes the amount not a whole uqor; such a call must never succeed.
-    function signed(bool refund, uint256 uqor, uint16 fraction, uint8 memoLen, uint8 mode) external {
+    function signed(bool refund, uint256 uqor, uint16 fraction, uint8 memoLen, uint8 mode) external primed {
         uint256 amount = bound(uqor, 1, 1_000_000) * UQOR + (fraction % 4 == 3 ? uint256(fraction) : 0);
         bridge.setMode(FakeBridge.Mode(bound(mode, 0, 9) > 5 ? 0 : bound(mode, 0, 5)));
         string memory memo = _memo(bound(memoLen, 0, 50));
@@ -69,7 +94,7 @@ contract QorHandler is Test {
     }
 
     /// A signature whose transaction reverted is still unspent, so reusing it may succeed exactly once.
-    function replay() external {
+    function replay() external primed {
         if (lastSig.length == 0) return;
         uint256 before = ledger.nonce();
         bool ok;
@@ -88,7 +113,7 @@ contract QorHandler is Test {
         }
     }
 
-    function forged(uint256 uqor, bytes32 seed) external {
+    function forged(uint256 uqor, bytes32 seed) external primed {
         bytes memory sig = new bytes(PqAuth.SIG_LEN);
         for (uint256 i = 0; i < 32; i++) {
             sig[i] = seed[i];
@@ -96,7 +121,7 @@ contract QorHandler is Test {
         try ledger.pay(bound(uqor, 1, 1_000_000) * UQOR, "", block.timestamp + 1 hours, sig) {} catch {}
     }
 
-    function fund(uint256 amount) external {
+    function fund(uint256 amount) external primed {
         amount = bound(amount, 1, 2 ether);
         vm.deal(address(this), amount);
         (bool ok,) = address(ledger).call{value: amount}("");
@@ -152,7 +177,8 @@ contract HavenLedgerQorInvariantTest is FixtureQor {
         assertEq(address(ledger).balance, FUNDED + handler.funded() - toPayer - toPayee);
     }
 
-    /// Only signed whole-uqor calls through an honest bridge can succeed, and the run must include some.
+    /// Only signed whole-uqor calls through an honest bridge can succeed, and the honest payment that opens
+    /// every run (see `primed`) must have gone through.
     function afterInvariant() public view {
         assertEq(handler.moved(), ledger.payoutCount());
         assertGt(handler.moved(), 0);

@@ -29,7 +29,32 @@ contract Handler is Test {
         payer = ledger_.payer();
     }
 
-    function signed(bool refund, uint256 amount, uint8 memoLen, uint8 mode) external {
+    /// Every run begins with one honest payment, so each run checks the invariants over real payouts and
+    /// proves the honest path still works. `pay` is not wrapped in try: if it reverts, `moved` stays 0 and
+    /// `afterInvariant` fails the run.
+    modifier primed() {
+        if (moved == 0) {
+            uint256 amount = 1_000;
+            uint256 deadline = block.timestamp + 1 hours;
+            bytes memory sig = PqTestKeys.sign(
+                payer,
+                PqAuth.encodeMessage(
+                    block.chainid,
+                    address(ledger),
+                    payer,
+                    ledger.PAY(),
+                    ledger.nonce(),
+                    deadline,
+                    ledger.argsHash(ledger.payee(), amount, "")
+                )
+            );
+            ledger.pay(amount, "", deadline, sig);
+            moved++;
+        }
+        _;
+    }
+
+    function signed(bool refund, uint256 amount, uint8 memoLen, uint8 mode) external primed {
         amount = bound(amount, 1, 600_000);
         bridge.setMode(FakeBridge.Mode(bound(mode, 0, 9) > 5 ? 0 : bound(mode, 0, 5)));
         string memory memo = _memo(bound(memoLen, 0, 60));
@@ -67,7 +92,7 @@ contract Handler is Test {
     }
 
     /// A signature whose transaction reverted is still unspent, so reusing it may succeed exactly once.
-    function replay() external {
+    function replay() external primed {
         if (lastSig.length == 0) return;
         uint256 before = ledger.nonce();
         bool ok;
@@ -86,7 +111,7 @@ contract Handler is Test {
         }
     }
 
-    function forged(uint256 amount, bytes32 seed) external {
+    function forged(uint256 amount, bytes32 seed) external primed {
         bytes memory sig = new bytes(PqAuth.SIG_LEN);
         for (uint256 i = 0; i < 32; i++) {
             sig[i] = seed[i];
@@ -138,7 +163,8 @@ contract HavenLedgerInvariantTest is Fixture {
         assertEq(token.balanceOf(address(ledger)), FUNDED - out);
     }
 
-    /// Only signed calls through an honest bridge can succeed, and the run must include some.
+    /// Only signed calls through an honest bridge can succeed, and the honest payment that opens every run
+    /// (see `primed`) must have gone through.
     function afterInvariant() public view {
         assertEq(handler.moved(), ledger.payoutCount());
         assertGt(handler.moved(), 0);

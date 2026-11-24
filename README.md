@@ -124,7 +124,7 @@ Adding a `memo.length <= 140` check in Solidity would have caught long notes bef
 
 Everything below runs on QoreChain Diana (`qorechain-diana`, EVM chain ID `9800`) using test fUSD. If the live testnet RPC is unreachable, `/verify` reports `"Could not reach the testnet"` rather than a false pass (see [Known limits](#known-limits)).
 
-1. Browser cross-lane verification (no wallet, no setup): open [haven-ledger-nine.vercel.app/verify](https://haven-ledger-nine.vercel.app/verify) and click Verify both lanes to check all 7 scenes across EVM and Native CosmWasm live.
+1. Browser cross-lane verification (no wallet, no setup): open [haven-ledger-nine.vercel.app/verify](https://haven-ledger-nine.vercel.app/verify) and click Verify both lanes to check all 7 scenes across EVM and Native CosmWasm live. Further down the same page, Verify the QOR ledger checks the QOR ledger's 6 scenes, including each payout's Native bank balance change.
 2. One-command hash verification from a clone (no keys):
    ```bash
    git clone --recurse-submodules https://github.com/datharnu/haven-ledger
@@ -138,8 +138,8 @@ Everything below runs on QoreChain Diana (`qorechain-diana`, EVM chain ID `9800`
    forge build && forge test
    npm run typecheck && npm run test:ts
    ```
-   Runs 67 Foundry tests (see [Evidence: Foundry tests, fuzzing, and invariants](#evidence-foundry-tests-fuzzing-and-invariants)) and 13 TypeScript tests; `cd apps/web && npm run test:unit` runs 17 more for the web verifier.
-4. Receipt ↔ payout reconciliation (read-only, no keys): `npm run reconcile` lists every `qday-receipts` receipt, keeps only those from the ledger's `qor1` address, and matches them both ways against `payout(i)` and the `Moved` events. On 23 November 2026 it printed `2 matched, 0 mismatched, 5 receipts from other senders ignored`.
+   Runs 67 Foundry tests (see [Evidence: Foundry tests, fuzzing, and invariants](#evidence-foundry-tests-fuzzing-and-invariants)) and 18 TypeScript tests; `cd apps/web && npm ci && npm run test:unit` runs 30 more for the web verifier.
+4. Receipt ↔ payout reconciliation (read-only, no keys): `npm run reconcile` lists every `qday-receipts` receipt, keeps only those from the ledger's `qor1` address, and matches them both ways against `payout(i)` and the `Moved` events. It prints `2 matched, 0 mismatched, N receipts from other senders ignored` (29 on 24 November 2026; N grows as others use `qday-receipts`).
 
 ---
 
@@ -166,6 +166,24 @@ Built for Build Before Q-Day (`https://build.qorechain.io/`), category bounty Cr
 | Atomic execution shown on testnet | Scenes 1 and 6 land EVM transfers and Native receipts together; Scenes 2 and 3 prove rollback from both Native and EVM refusals ([all 7 scenes](#evidence-deploy-fund-and-all-seven-scenes-22-november-2026)). The QOR ledger repeats this with the payout landing in the payee's Native bank balance in the same transaction ([6 QOR scenes](#evidence-qor-ledger-23-november-2026)). | Scene 8 (window hiding the bridge) was skipped because `eth_call` cannot preview it and a live broadcast would have executed a valid payout. |
 | Public GitHub repository under MIT or Apache-2.0 | `https://github.com/datharnu/haven-ledger`, Apache-2.0 (`LICENSE`). | Deployed bytecode is not verified against source on the explorer (`foundry.toml` has compiler settings). |
 | README, testnet addresses, and video (up to 3 min) | This single-file `README.md` holds all addresses, hashes, and limits; shot list in `docs/DEMO.md`; cover in `docs/cover.png`. | [Demo video](https://drive.google.com/file/d/1YuR6Qxvw3hu0RyfVZHXfCtITZ4FG69k4/view) (2:46). Motion-graphics explainer built from the recorded evidence, with synthetic narration (ElevenLabs); not a screen recording of a live session. `docs/cover.png` not yet uploaded to the project page. |
+
+
+### Where the PQC checks are (for jurors)
+
+The two Solidity PQC items (`pqcVerify`, `pqcKeyStatus`) are checked by hand, so here is every call site.
+
+| Contract | What the ML-DSA-87 check protects | Call site |
+| --- | --- | --- |
+| `HavenLedger` (fUSD) | Payer's key status at creation; every `pay`/`refund` needs the payer's fresh signature | [`src/HavenLedger.sol` L83](src/HavenLedger.sol#L83) → `PqAuth.init`; [L148](src/HavenLedger.sol#L148) → `PqAuth.authorize` |
+| `HavenLedgerQor` (QOR) | Same, with its own signed actions | [`src/HavenLedgerQor.sol` L93](src/HavenLedgerQor.sol#L93); [L184](src/HavenLedgerQor.sol#L184) |
+
+All ML-DSA-87 checks go through the vendored kit `haven-pq-kit` (git submodule `lib/haven-pq-kit`, pinned at `9fe7ac2`; GitHub shows submodules only as a link, so the lines are linked here):
+
+- Precompile addresses: [`PqAuth.sol` L8–9](https://github.com/datharnu/haven-pq-kit/blob/9fe7ac289f512e39bce6a2d5e31baeb98195519c/src/PqAuth.sol#L8-L9) — `pqcVerify` `0x…0a01`, `pqcKeyStatus` `0x…0a02`.
+- `pqcVerify` call: [`PqAuth.verify`, L75–84](https://github.com/datharnu/haven-pq-kit/blob/9fe7ac289f512e39bce6a2d5e31baeb98195519c/src/PqAuth.sol#L75-L84); `pqcKeyStatus` call: [`PqAuth._status`, L95–105](https://github.com/datharnu/haven-pq-kit/blob/9fe7ac289f512e39bce6a2d5e31baeb98195519c/src/PqAuth.sol#L95-L105), used by [`_loadKey`, L86](https://github.com/datharnu/haven-pq-kit/blob/9fe7ac289f512e39bce6a2d5e31baeb98195519c/src/PqAuth.sol#L86) (registered, ML-DSA-87, possession proven, 2,592-byte key; fails closed).
+- Single-signer authorization (nonce, deadline, domain-separated message): [`PqAuth.authorize`, L45](https://github.com/datharnu/haven-pq-kit/blob/9fe7ac289f512e39bce6a2d5e31baeb98195519c/src/PqAuth.sol#L45).
+
+**Shared deployer.** `spike` (`qor143f0ghn8slqguwez73087dvq8lqnuuukqdu9fl`) deploys and relays for all four Haven entries (Courier, Haven Escrow, Haven Ledger, Steward). Project-page badges proven by its transactions do not by themselves mean this project uses that feature; `docs/kits.md` and this README say what this project uses.
 
 ---
 

@@ -4,8 +4,11 @@
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "test:sol": "/opt/homebrew/bin/forge test",
+    "test:sol": "scripts/forge.sh test",
     "test:ts": "vitest run",
     "typecheck": "tsc --noEmit",
     "fund-account": "tsx scripts/fund-account.ts",
