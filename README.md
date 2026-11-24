@@ -49,12 +49,13 @@ How can a judge try it right now? Open [haven-ledger-nine.vercel.app/verify](htt
 11. [Repository map](#repository-map)
 12. [Roadmap](#roadmap)
 13. [Built during the hackathon](#built-during-the-hackathon)
-14. [AI disclosure](#ai-disclosure)
-15. [Evidence: testnet addresses](#evidence-testnet-addresses)
-16. [Evidence: deploy, fund, and all seven scenes (22 November 2026)](#evidence-deploy-fund-and-all-seven-scenes-22-november-2026)
-17. [Evidence: QOR ledger (23 November 2026)](#evidence-qor-ledger-23-november-2026)
-18. [Evidence: Foundry tests, fuzzing, and invariants](#evidence-foundry-tests-fuzzing-and-invariants)
-19. [Evidence: design decisions and cost breakdown](#evidence-design-decisions-and-cost-breakdown)
+14. [Credits](#credits)
+15. [AI disclosure](#ai-disclosure)
+16. [Evidence: testnet addresses](#evidence-testnet-addresses)
+17. [Evidence: deploy, fund, and all seven scenes (22 November 2026)](#evidence-deploy-fund-and-all-seven-scenes-22-november-2026)
+18. [Evidence: QOR ledger (23 November 2026)](#evidence-qor-ledger-23-november-2026)
+19. [Evidence: Foundry tests, fuzzing, and invariants](#evidence-foundry-tests-fuzzing-and-invariants)
+20. [Evidence: design decisions and cost breakdown](#evidence-design-decisions-and-cost-breakdown)
 
 ---
 
@@ -139,7 +140,7 @@ Everything below runs on QoreChain Diana (`qorechain-diana`, EVM chain ID `9800`
    npm run typecheck && npm run test:ts
    ```
    Runs 67 Foundry tests (see [Evidence: Foundry tests, fuzzing, and invariants](#evidence-foundry-tests-fuzzing-and-invariants)) and 18 TypeScript tests; `cd apps/web && npm ci && npm run test:unit` runs 30 more for the web verifier.
-4. Receipt ↔ payout reconciliation (read-only, no keys): `npm run reconcile` lists every `qday-receipts` receipt, keeps only those from the ledger's `qor1` address, and matches them both ways against `payout(i)` and the `Moved` events. It prints `2 matched, 0 mismatched, N receipts from other senders ignored` (29 on 24 November 2026; N grows as others use `qday-receipts`).
+4. Receipt ↔ payout reconciliation (read-only, no keys): `npm run reconcile` lists every `qday-receipts` receipt, keeps only those from the ledger's `qor1` address, and matches them both ways against `payout(i)` and the `Moved` events. It prints `2 matched, 0 mismatched, N receipts from other senders ignored` (30 on 24 November 2026; N grows as others use `qday-receipts`).
 
 ---
 
@@ -157,6 +158,20 @@ Everything below runs on QoreChain Diana (`qorechain-diana`, EVM chain ID `9800`
 ---
 
 ## Rubric and track mapping
+
+### Judging rubric (official weights)
+
+The [builder FAQ](https://build.qorechain.io/faq) scores every track on the same five criteria; jurors check the [track requirements](#track-requirements) under them. Each row points to evidence that already exists and can be checked in about a minute.
+
+| Criterion (weight) | Where to check it (in about a minute) | Honest limit |
+| --- | --- | --- |
+| **Works as described (25%)** | Open [/verify](https://haven-ledger-nine.vercel.app/verify) and click **Verify both lanes** (7 fUSD scenes across EVM and Native CosmWasm), then **Verify the QOR ledger** further down (6 QOR scenes, including each payout's Native bank balance change), with no wallet. From a clone, `npm run evidence` prints **47 passed, 0 failed** and `npm run reconcile` prints **2 matched, 0 mismatched** for each ledger (no keys). `forge test` runs 67 tests, `npm run test:ts` 18 and the web verifier's Vitest 30, 0 failed. Full path: [Judge it in 5 minutes](#judge-it-in-5-minutes). | Testnet only: the bridge, `qday-receipts` and fUSD exist on `qorechain-diana` only. Scene 7 (unlisted target) was refused in preflight and never broadcast, and Scene 8 was skipped ([Deliberately absent](#deliberately-absent)). |
+| **QoreChain tech usage (25%)** | Cross-VM bridge precompile `0x…0901` called inside `pay` / `refund` of `HavenLedger` `0x4B6E…6918` and `HavenLedgerQor` `0x0871…919b` ([addresses](#evidence-testnet-addresses)). The target, `qday-receipts` (`qor1xjayq5…gltw8`), is on the chain's `bridge_allowed_targets` list and pinned to `code_id 865` (`/qorechain/crossvm/v1/params`). Scene 1 `0x915c5f80…` wrote receipt #4 in the same transaction as the fUSD transfer; QOR Scene 1 `0xc41d45e3…` wrote receipt #11 with the payee's bank balance +1,000,000 uqor ([fUSD](#evidence-deploy-fund-and-all-seven-scenes-22-november-2026), [QOR](#evidence-qor-ledger-23-november-2026)). Windows scoped to `[ledger, 0x…0901]`, opened by hybrid ML-DSA-87 transactions; payer key registered with proof of possession (`E8B758F2…`); fUSD via `MsgConvertCoin` (`9ECA49BB…`). `pqcVerify` / `pqcKeyStatus` call sites: [Where the PQC checks are](#where-the-pqc-checks-are-for-jurors). | The deployer and relayer `spike` is shared by all four Haven entries, so the project page can show features proven by its other projects' transactions. Haven Ledger does not use AMM pools, QoreSeal or its key registry, smart accounts, MCP or QoreScan (`docs/kits.md`). |
+| **Post-quantum correctness and security (20%)** | Every `pay` and `refund` needs a fresh ML-DSA-87 signature from the payer (`PqAuth.authorize` → `pqcVerify`), and the payer's key status is checked at creation and on every call (`pqcKeyStatus`). Scenes 4 and 5: a junk signature and a replayed Scene 1 signature both reverted `SignatureInvalid` before the bridge was called; a `pay` signature cannot be reused on `refund`. Funds go only to the payer or payee fixed at creation. `NativeReceipt.sol` rejects a bridge reply with another sender, note or extra field (fuzzed, 256 runs). [`THREAT_MODEL.md`](THREAT_MODEL.md), [Where each attack or failure stops](#where-each-attack-or-failure-stops). | No external audit and no QCAI report. Anyone can write to `qday-receipts`; a reader must check that the receipt's `sender` is the ledger's `qor1` address, which `/verify` and `npm run reconcile` do through `verifyLedgerReceipt`, but a third-party reader must do the same. Foundry has no bridge or PQC precompiles, so contract tests use mocks; live behaviour is proven on testnet. |
+| **Originality (15%)** | Rollback is proven live in both directions: a Native refusal reverted the whole EVM payout (Scene 2), and an EVM failure undid a Native receipt that had already been written (Scene 3) ([Rollback proven live](#rollback-proven-live-in-both-directions)). `HavenLedgerQor` pays native QOR, so one transaction moves the payee's Native bank balance and writes the receipt together. The receipt's author is the ledger's own `qor1` address, derived on chain (`Bech32.sol`), so no key can write as it. | It writes to an existing governance-approved contract rather than a new Native contract. In the fUSD ledger value moves on the EVM lane only, and QOR payouts are still sent by an EVM contract ([What the Native side gets](#what-the-native-side-gets)). The call shape follows QoreChain's `workshop-3/02-cross-vm` ([Credits](#credits)). |
+| **Clarity, UX and documentation (15%)** | [Demo video (2:46)](https://drive.google.com/file/d/1YuR6Qxvw3hu0RyfVZHXfCtITZ4FG69k4/view); [Judge it in 5 minutes](#judge-it-in-5-minutes); `/verify` shows both lanes side by side and rejects a labelled spoofed receipt; [Why Cross-VM, not a log](#why-cross-vm-not-a-log), [`THREAT_MODEL.md`](THREAT_MODEL.md), `docs/SPEC.md`, [Known limits](#known-limits). | The video is a motion-graphics explainer with synthetic narration, not a screen recording of a live session. Diana's explorer cannot verify Solidity source; compiler settings are in `foundry.toml`. |
+
+### Track requirements
 
 Built for Build Before Q-Day (`https://build.qorechain.io/`), category bounty Cross-VM ("Build an application where an EVM contract atomically calls an approved Native contract"). Deadline: 2 December 2026 at 23:59 UTC.
 
@@ -195,11 +210,11 @@ All ML-DSA-87 checks go through the vendored kit `haven-pq-kit` (git submodule `
 - Automated checks passed on 22 November 2026: `npm run evidence` (47 passed, 0 failed, 23 Nov), `forge test` (67 passed, 0 failed, 23 Nov), and GitHub Actions run `45005303250` (contract job).
 - `npm run reconcile` on 23 November 2026: `qday-receipts` held 7 receipts; receipts 4 and 5 came from the ledger and matched payouts 0 (pay 100,000) and 1 (refund 200,000) and their `Moved` events; receipts 1, 2, 3, 6, and 7 came from other senders and were set aside; 0 mismatches.
 - Live browser verification at `https://haven-ledger-nine.vercel.app/verify` passed on 22 November 2026 at 390px and 1440px (7 checked, 2 agreed on both lanes, 4 refused, 1 no hash, 0 overflow, 0 RPC errors).
+- The sender check and the labelled spoofed-receipt example are deployed on `https://haven-ledger-nine.vercel.app/verify` (page checked on 24 November 2026), alongside **Verify the QOR ledger**; they also pass locally (unit tests, Playwright smoke at 390px and 1440px).
 
 ### Built, not observed
 
 - CI web smoke job is configured in `.github/workflows/test.yml`; run `45005303250` ran the contract job only.
-- The visible sender check and the spoofed-receipt example on `/verify` pass locally (unit tests, Playwright smoke at 390px and 1440px, and the live `/verify` test on 23 November 2026); they reach `haven-ledger-nine.vercel.app` only after the next deploy.
 
 ### Deliberately absent
 
@@ -272,7 +287,41 @@ Do not re-run `npm run deploy`, `npm run fund-account`, `npm run fund-ledger`, o
 
 Built during Build Before Q-Day (November 2026; deadline 2 December 2026 at 23:59 UTC). First commit: `62e1293` on 22 November 2026 (`Add the Apache-2.0 license.`). Licence: Apache-2.0 (`LICENSE`).
 
-Credits: `@qorechain/sdk` 0.14.0, `@qorechain/evm` 0.14.0, `@qorechain/pqc` 0.2.3; `haven-pq-kit` v0.1.0 (`9fe7ac289f512e39bce6a2d5e31baeb98195519c`, interface following `qore-pq-kit` by Adityaakr, Apache-2.0); `forge-std` v1.17.0 (`f3dae6e6ee381f25eb6a246f7da9b85c91a68219`); Cross-VM call shape follows QoreChain's `workshop-3/02-cross-vm` ([build-before-qday](https://github.com/qorechain/build-before-qday)).
+Open-source libraries, kits and the workshop template are credited in [Credits](#credits).
+
+---
+
+## Credits
+
+Built from the repository's dependency files: `package.json`, `apps/web/package.json` (versions as resolved in each `package-lock.json`) and `git submodule status`. Licences are taken from each package's own `package.json`. Transitive dependencies are not listed.
+
+**QoreChain kits and network packages**
+- `@qorechain/sdk` 0.14.0 (Apache-2.0)
+- `@qorechain/evm` 0.14.0 (Apache-2.0)
+- `@qorechain/pqc` 0.2.3 (Apache-2.0), root and web app
+- viem 2.47.6 (MIT), root and web app
+- `@cosmjs/stargate` 0.39.0 (Apache-2.0)
+
+**Post-quantum and crypto libraries**
+- `haven-pq-kit` v0.1.0 (Apache-2.0): git submodule `lib/haven-pq-kit` at commit `9fe7ac289f512e39bce6a2d5e31baeb98195519c`, and the npm dependency `github:datharnu/haven-pq-kit#v0.1.0` ([repository](https://github.com/datharnu/haven-pq-kit)). Its `PqAuth` interface follows the public design of [`qore-pq-kit`](https://github.com/Adityaakr/qore-pq-kit) by Adityaakr, Apache-2.0.
+
+**Contracts toolchain**
+- Foundry (`forge`), Solidity 0.8.28 (`foundry.toml`: optimizer 200 runs, `via_ir`)
+- `forge-std` v1.17.0 (MIT OR Apache-2.0): git submodule `lib/forge-std` at commit `f3dae6e6ee381f25eb6a246f7da9b85c91a68219` ([repository](https://github.com/foundry-rs/forge-std))
+
+**Web app frameworks and UI** (`apps/web`)
+- Next.js (`next`) 16.4.6 (MIT), React and React DOM 19.1.1 (MIT)
+- Tailwind CSS 4.1.17 and `@tailwindcss/postcss` 4.1.17 (MIT, dev)
+- Fonts: `@fontsource/familjen-grotesk`, `@fontsource/fragment-mono`, `@fontsource/newsreader` 5.3.0 (OFL-1.1)
+
+**Testing and tooling**
+- TypeScript 5.6.3 (Apache-2.0), `tsx` 4.19.4 (MIT), `@types/node` 22.19.1 (MIT), root and web app
+- Vitest 3.2.4 (MIT), root and web app
+- `@playwright/test` 1.65.1 (Apache-2.0), `@types/react` 19.1.16 and `@types/react-dom` 19.1.9 (MIT), dev dependencies of `apps/web`
+
+**Design references and prior work**
+- The Cross-VM call shape follows QoreChain's `workshop-3/02-cross-vm` in [build-before-qday](https://github.com/qorechain/build-before-qday/tree/main/workshop-3/02-cross-vm). The Native target `qday-receipts` is QoreChain's existing governance-approved contract; this repository does not deploy a Native contract.
+- Demo video (not in this repository): built in Remotion; narration by an ElevenLabs synthetic voice; background track "Vastness" from Mixkit (see [AI disclosure](#ai-disclosure)).
 
 ---
 
