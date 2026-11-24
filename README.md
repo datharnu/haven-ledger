@@ -32,6 +32,23 @@ What is the biggest risk? Anyone can write directly to `qday-receipts` (on 23 No
 
 How can a judge try it right now? Open [haven-ledger-nine.vercel.app/verify](https://haven-ledger-nine.vercel.app/verify) and click Verify both lanes to inspect the 7 fUSD scenes and 6 QOR scenes across EVM, Native CosmWasm and the Native bank live with no wallet, or clone the repo and run `npm run evidence` (47 checks, 0 keys).
 
+
+### Cross-VM evidence for the manual check
+
+The fest's automatic checker marks Cross-VM only for a native `MsgCrossVMCall` signed by a listed address, so this path (an EVM contract calling the bridge precompile `0x…0901`) is checked by hand. Everything a juror needs, on `qorechain-diana` (EVM chain ID 9800):
+
+| What | Value |
+| --- | --- |
+| EVM contract, fUSD ledger | `HavenLedger` `0x4B6E4ed0Caf9899c07c9922DEb0b85A2504E6918` (Native name `qor1fdhya5x2lxyecp7fjgk7kzu95fgyu6gcs40yzu`) |
+| EVM contract, QOR ledger | `HavenLedgerQor` `0x087180B80f356AAFB772b091fa7CE5C03675919b` (Native name `qor1ppccpwq0x442ldmjkzgl5l89cqm8tyvm3recw3`) |
+| Approved Native contract | `qday-receipts` `qor1xjayq5ev55tkzpml9klxwyshr7gdrha0nurha9jhm0f0gdckksgs3gltw8`, **code id 865** (label `qday-receipts-w3`), listed in `bridge_allowed_targets` and pinned to code 865 in `/qorechain/crossvm/v1/params` |
+| Successful EVM → Native call (fUSD) | `0x915c5f80901db1c4097ca1d766a07e86876dd41bf9050a4b37f4a50593e468a3`, status `0x1`, block 10543960: 0.1 fUSD paid and Native receipt #4 written by the ledger's own `qor1` |
+| Successful EVM → Native call (QOR) | `0xc41d45e30ce0cd081351aaefe6b50a494c40fd1b2a38b7cc44cbf88c0af0aa3e`, status `0x1`, block 10611180: 1 QOR paid (payee bank +1,000,000 uqor) and Native receipt #11 |
+| Native side failed, EVM rolled back | `0xe30358d24980be8452ba43259b3427f31365fda9b3412d1fcba738aa98e5c0ed`, status `0x0`, block 10544028: `qday-receipts` refused a note over 140 characters; no transfer, no receipt (count stayed 4) |
+| EVM side failed after the Native write, receipt undone | `0x73bc77241f860c4d809f9318085a756b181108b8f06b530a3070951fb23c2532`, status `0x0`, block 10611229: `InsufficientBalance` after the receipt call; receipt count stayed 11 |
+
+Re-check without keys: `npm run evidence` and `npm run reconcile`, or [/verify](https://haven-ledger-nine.vercel.app/verify).
+
 ---
 
 ## Contents
